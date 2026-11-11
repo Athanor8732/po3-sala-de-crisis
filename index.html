@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Simulador de gestión de playas (PO3, Aguas Marinas, UB): episodio de lluvia de septiembre de 2020 en Barcelona.">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,"Segoe UI",sans-serif}img{max-width:100%}</style>
+</head>
+<body>
+<title>Sala de crisis · Playas de Barcelona</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: barra de control fija con reloj simulado; debajo, mapa a la izquierda y panel del turno a la derecha (una columna en móvil). */
+:root {
+  --bg: #edf2f5; --surface: #ffffff; --surface-2: #f5f8fa; --ink: #10232e; --muted: #576b76; --line: #d2dde3;
+  --accent: #0b6e8a; --accent-ink: #ffffff;
+  --sea: #d6e8f0; --land: #f3f1ec; --sand: #e6c983; --rock: #9aa7ae;
+  --flag-g: #2c8a52; --flag-y: #e2b100; --flag-r: #cf3a2e; --flag-n: #c8d2d8;
+  --x4: #1f5fa6; --d5: #d47d22; --vert: #7b3fa3; --mues: #1f5fa6; --plume: rgba(123, 63, 163, .22);
+  --font-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b161c; --surface: #12212a; --surface-2: #172a34; --ink: #e4edf1; --muted: #93a8b3; --line: #253944;
+    --accent: #4db2cf; --accent-ink: #06222b;
+    --sea: #0f2b38; --land: #19252b; --sand: #b9984f; --rock: #5d6c74;
+    --flag-g: #3fb06c; --flag-y: #f0c419; --flag-r: #ec5a4c; --flag-n: #3a4b55;
+    --x4: #5b9be0; --d5: #ee9a45; --vert: #b27ad6; --mues: #5b9be0; --plume: rgba(178, 122, 214, .25);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b161c; --surface: #12212a; --surface-2: #172a34; --ink: #e4edf1; --muted: #93a8b3; --line: #253944;
+  --accent: #4db2cf; --accent-ink: #06222b;
+  --sea: #0f2b38; --land: #19252b; --sand: #b9984f; --rock: #5d6c74;
+  --flag-g: #3fb06c; --flag-y: #f0c419; --flag-r: #ec5a4c; --flag-n: #3a4b55;
+  --x4: #5b9be0; --d5: #ee9a45; --vert: #b27ad6; --mues: #5b9be0; --plume: rgba(178, 122, 214, .25);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h2 { font-size: 1.35rem; font-weight: 700; }
+h3 { font-size: 1.02rem; font-weight: 600; letter-spacing: .02em; }
+p { margin: 0; }
+.wrap { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.eyebrow { font-family: var(--font-display); font-size: .74rem; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* barra de control */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding-block: 12px; max-width: 1400px; margin: 0 auto; }
+.brand { display: flex; flex-direction: column; min-width: 0; }
+.brand h1 { font-size: 1.15rem; font-weight: 700; }
+.clock { display: flex; align-items: baseline; gap: 10px; margin-left: auto; }
+.clock .day { font-family: var(--font-display); font-size: 1.05rem; font-weight: 600; color: var(--muted); }
+.clock .time { font-family: var(--font-mono); font-size: 1.9rem; font-weight: 600; letter-spacing: -.02em; }
+.steps { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+@media (min-width: 1180px) {
+  .bar-in { flex-wrap: nowrap; padding-block: 8px; }
+  .steps { order: 2; width: auto; flex: 1 1 auto; flex-wrap: nowrap; }
+  .clock { order: 3; margin-left: 0; }
+  .step { padding: 5px 9px; }
+}
+.step { flex: 1 1 120px; min-width: 0; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 8px; padding: 7px 10px; text-align: left; cursor: pointer; font: inherit; display: flex; flex-direction: column; gap: 1px; }
+.step b { font-family: var(--font-display); font-size: .95rem; }
+.step span { font-size: .78rem; color: var(--muted); }
+.step[aria-current="step"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.step[aria-current="step"] span { color: var(--accent-ink); opacity: .85; }
+.step:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* rejilla principal */
+main { max-width: 1400px; margin: 0 auto; padding-block: 18px 40px; display: flex; flex-direction: column; gap: 18px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; min-width: 0; }
+.stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+#panel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+@media (max-width: 960px) { #panel { grid-template-columns: minmax(0, 1fr); } }
+
+/* mapa: costa horitzontal, ocupa tota l'amplada */
+.map-card { display: flex; flex-direction: column; gap: 8px; }
+@media (min-width: 961px) and (min-height: 640px) {
+  .map-card { position: sticky; top: calc(env(safe-area-inset-top, 0px) + var(--bar-h, 96px)); z-index: 4; box-shadow: 0 10px 18px -16px rgba(0, 0, 0, .45); }
+  svg.map { max-height: 34vh; }
+}
+.strip-row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.strip { flex: 1 1 100%; min-width: 0; display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); gap: 4px; }
+@media (max-width: 700px) { .strip { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.sc { display: flex; align-items: center; gap: 5px; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; background: var(--surface-2); color: var(--ink); font: inherit; font-size: .74rem; cursor: pointer; text-align: left; }
+.sc .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sc .dot { width: 18px; height: 18px; font-size: .64rem; }
+.sc.verde { background: var(--flag-g); border-color: var(--flag-g); color: #fff; }
+.sc.amarilla { background: var(--flag-y); border-color: var(--flag-y); color: #231c00; }
+.sc.roja { background: var(--flag-r); border-color: var(--flag-r); color: #fff; }
+.sc.nd { background: var(--flag-n); border-color: var(--flag-n); }
+.sc[disabled] { cursor: default; }
+.strip-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.strip-tools .btn { padding: 4px 9px; font-size: .78rem; }
+.day-box { display: flex; flex-direction: column; gap: 2px; }
+.map-foot { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: center; }
+.beach, .blab { cursor: pointer; }
+.map-foot-d summary { cursor: pointer; width: max-content; }
+.map-foot-d[open] summary { margin-bottom: 6px; }
+@media (min-width: 961px) and (max-height: 900px) { svg.map { max-height: 27vh; } }
+.map-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; align-items: baseline; }
+svg.map { width: 100%; height: auto; display: block; border-radius: 8px; background: var(--land); }
+.toggles { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .85rem; color: var(--muted); }
+.toggles label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: .8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-right: 5px; }
+.flagmode { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.flagmode button { border: 0; background: var(--surface-2); color: var(--muted); padding: 5px 10px; font: inherit; font-size: .8rem; cursor: pointer; }
+.flagmode button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+.flagmode button:disabled { opacity: .45; cursor: not-allowed; }
+
+/* panel del turno */
+.inject { border-left: 4px solid var(--accent); background: var(--surface-2); padding: 12px 14px; border-radius: 0 8px 8px 0; font-size: 1.05rem; font-style: italic; }
+.tasks { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 6px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.kpi { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; }
+.kpi .v { font-family: var(--font-mono); font-size: 1.35rem; font-weight: 600; }
+.kpi .l { font-size: .78rem; color: var(--muted); }
+.kpi.on { box-shadow: inset 0 0 0 2px var(--flag-r); }
+.chart { width: 100%; height: auto; display: block; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+th, td { padding: 5px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { font-family: var(--font-display); font-weight: 600; color: var(--muted); font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.bad { color: var(--flag-r); font-weight: 600; }
+.empty { color: var(--muted); font-style: italic; }
+.note { font-size: .82rem; color: var(--muted); }
+.res { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; }
+.res div { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; font-size: .88rem; }
+.res b { display: block; font-family: var(--font-display); }
+
+/* decisiones */
+.dec { display: flex; flex-direction: column; }
+.dec-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.dec-row .n { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.dot { flex: none; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-family: var(--font-mono); font-size: .72rem; font-weight: 600; background: var(--ink); color: var(--surface); }
+.flags { display: inline-flex; gap: 4px; }
+.flags button { width: 64px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 6px; padding: 4px 0; font: inherit; font-size: .78rem; cursor: pointer; }
+.flags button[data-f="verde"][aria-pressed="true"] { background: var(--flag-g); border-color: var(--flag-g); color: #fff; }
+.flags button[data-f="amarilla"][aria-pressed="true"] { background: var(--flag-y); border-color: var(--flag-y); color: #231c00; }
+.flags button[data-f="roja"][aria-pressed="true"] { background: var(--flag-r); border-color: var(--flag-r); color: #fff; }
+.row-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); border-radius: 8px; padding: 6px 12px; font: inherit; font-size: .85rem; cursor: pointer; }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.chip { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: .76rem; font-weight: 600; }
+.chip.verde { background: var(--flag-g); color: #fff; } .chip.amarilla { background: var(--flag-y); color: #231c00; } .chip.roja { background: var(--flag-r); color: #fff; } .chip.nd { background: var(--flag-n); color: var(--ink); }
+.match { color: var(--flag-g); font-weight: 600; } .miss { color: var(--flag-r); font-weight: 600; }
+input[type=range] { width: 100%; accent-color: var(--accent); }
+.days { display: flex; justify-content: space-between; font-size: .75rem; color: var(--muted); font-family: var(--font-mono); }
+.lesson { display: flex; flex-direction: column; gap: 6px; padding-left: 1.2em; margin: 0; }
+.sched { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; font-size: .9rem; }
+.sched .t { font-family: var(--font-mono); color: var(--muted); }
+footer { max-width: 1400px; margin: 0 auto; padding-block: 0 32px; font-size: .78rem; color: var(--muted); }
+@media (prefers-reduced-motion: no-preference) { .beach { transition: fill .35s ease; } }
+</style>
+
+<header class="bar">
+  <div class="bar-in wrap">
+    <div class="brand">
+      <span class="eyebrow">PO3 · Aguas Marinas · Máster del Agua (UB)</span>
+      <h1>Sala de crisis · Playas de Barcelona</h1>
+    </div>
+    <div class="clock" aria-live="polite"><span class="day" id="clock-day">—</span><span class="time" id="clock-time">—</span></div>
+    <nav class="steps" id="steps" aria-label="Turnos de la simulación"></nav>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card map-card" aria-label="Mapa">
+    <div class="map-head">
+      <h3 id="map-title">Frente litoral de Barcelona</h3>
+      <div class="flagmode" role="group" aria-label="Color de las playas">
+        <button type="button" id="fm-dec" aria-pressed="true">Decisión de la clase</button>
+        <button type="button" id="fm-prot" aria-pressed="false">Protocolo</button>
+        <button type="button" id="fm-real" aria-pressed="false">Real</button>
+      </div>
+    </div>
+    <svg class="map" id="map" role="img" aria-label="Mapa de las playas de Barcelona con puntos de vertido y de muestreo"></svg>
+    <div class="strip-row" id="strip-row" hidden>
+      <div class="strip" id="strip" aria-label="Bandera de cada playa"></div>
+      <div class="strip-tools" id="strip-tools"></div>
+    </div>
+    <div class="day-box" id="day-box" hidden>
+      <input type="range" id="day" min="0" max="7" value="1" aria-label="Día">
+      <div class="days" id="days"></div>
+      <p class="note" id="day-motivo"></p>
+    </div>
+    <details class="map-foot-d"><summary class="note">Capas y leyenda</summary>
+    <div class="map-foot">
+    <div class="toggles">
+      <label><input type="checkbox" id="t-zona" checked> Zona de baño</label>
+      <label><input type="checkbox" id="t-vert" checked> Puntos de vertido</label>
+      <label><input type="checkbox" id="t-mues" checked> Puntos de muestreo</label>
+      <label><input type="checkbox" id="t-pluma"> Pluma del protocolo</label>
+    </div>
+    <div class="legend">
+      <span><i style="background:var(--flag-g)"></i>Verde</span>
+      <span><i style="background:var(--flag-y)"></i>Amarilla</span>
+      <span><i style="background:var(--flag-r)"></i>Roja</span>
+      <span><i style="background:var(--sand)"></i>Sin decidir</span>
+      <span><i style="background:var(--vert);border-radius:50%"></i>Vertido (tamaño = n.º de aliviaderos)</span>
+      <span><i style="background:var(--mues);clip-path:polygon(50% 0,100% 100%,0 100%)"></i>Muestreo ACA</span>
+    </div>
+    </div></details>
+  </section>
+
+  <div class="stack" id="panel"></div>
+</main>
+
+<footer class="wrap">
+  Mapa girado para poner la costa en horizontal (mar abajo); la flecha indica el norte. Playas, AMB; costa, ICGC 2026; aliviaderos y muestreo, ACA. Pluma: protocolo de la práctica (300 m, desplazada 150 m al SO).
+  Lluvia: Meteocat (XEMA). Banderas reales: Departament d'Interior (Dades obertes de Catalunya). Las analíticas, la llamada de los chiringuitos y la previsión del sábado son <b>simuladas</b> para la práctica. Las decisiones se guardan solo en este navegador.
+</footer>
+
+<script>
+const DATA = /*DATA*/JSON.parse(new TextDecoder().decode(Uint8Array.from(atob("eyJjb2FzdCI6W3sidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzQyMiwyMDldLFs0MTUsMjE4XSxbNDE0LDE3Nl0sWzQwMCwxMzhdLFs0MDIsMTIwXSxbNDE1LDExMV0sWzQxMCw3Ml0sWzM4OCw2OF0sWzM4Nyw1NV0sWzE5MSw3OF0sWzE5NCwxMDZdLFsxNzAsMTA5XSxbMjIzLDU3OV0sWzIxOCw1ODddLFs2Niw2MDFdLFsxNiwxNzRdLFswLDE3NF1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzAsMTM5Nl0sWzEyMiwxMzc0XSxbMTgzLDEzNTZdLFszMDAsMTMzNV0sWzMzMCwxMzM1XSxbMzQwLDEzMjZdLFs0MjMsMTMxMV0sWzQ5NiwxMjg2XSxbNTIwLDEyODddLFs1MjUsMTI2Nl1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1swLDEzNTZdLFs5OSwxMzM2XSxbOTYsMTMyM10sWzEwNCwxMzIxXSxbMTAxLDEzMDJdLFsxMTIsMTMwMF0sWzkzLDEyMDVdLFszOSwxMjE4XSxbNTYsMTI5NF0sWzY0LDEyOTZdLFs0NywxMzAwXSxbNTMsMTI5NV0sWzM1LDEyMTldLFswLDEyMjddXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMCwxMTQyXSxbMTM0LDEwNjldLFsxMzEsMTA2M10sWzI5Nyw5NjldLFsyNTUsODkyXSxbOTIsOTg1XSxbODEsMTAwN10sWzU5LDEwMjBdLFszMyw5NjZdLFsyOSw5NjhdLFsyNSw5NjFdLFs2MSw5MzldLFs0MCw5MDRdLFs0Miw4OTNdLFsyMTcsNzkzXSxbMjA0LDc2N10sWzIwNyw3NTldLFszMzUsNjg0XSxbMzc5LDc1OV0sWzQ0Miw3MjFdLFs0NTIsNzM4XSxbNDQxLDc0NV0sWzQ0Myw3NTBdLFs0NTUsNzQzXSxbNTA3LDgyOF0sWzU5Miw3NzhdLFs1NjcsNzIxXSxbNjI0LDcwNV0sWzU5MCw3MDJdLFs2MzQsNzAyXSxbNzEyLDY4MF0sWzY5Myw2MDhdLFs2MzIsNTc5XSxbNDQ2LDY4N10sWzQxMiw2MzddLFs0MDUsNTczXSxbNDE2LDU3Ml0sWzQyNyw2MzBdLFs0NjAsNjExXSxbNDQ5LDU1Nl0sWzQ1NSw1NTVdLFs0NjUsNjAzXSxbNDY5LDYwNV0sWzUwMiw1ODVdLFs0ODgsNTMyXSxbNDkzLDUzMV0sWzUwOCw1ODJdLFs1NDUsNTYwXSxbNTI0LDUwN10sWzUzMCw1MDRdLFs1NTEsNTU2XSxbNTg5LDUzNF0sWzU2NCw0ODNdLFs1NzAsNDgwXSxbNTk0LDUzMV0sWzYzMiw1MDhdLFs2MDgsNDY5XSxbNjE0LDQ2NV0sWzYyOCw0ODldLFs2MzgsNDgzXSxbNjQ2LDQ5OV0sWzY1Myw0OTVdLFs2NjQsNTE2XSxbNjc3LDUxMF0sWzY4NSw1MjVdLFs2OTgsNTE5XSxbNzA2LDUzNl0sWzcyMiw1MjhdLFs3MzMsNTQ4XSxbNzQ5LDU0MF0sWzc2MSw1NjFdLFs3OTQsNTQ5XSxbNzgyLDUyNF0sWzc5Nyw1MTddLFs4MTAsNTQxXSxbOTMyLDQ3OV0sWzkwMyw0MjNdLFs5MTAsNDE3XSxbOTY4LDQ1OF0sWzEwNzUsMzExXSxbOTY2LDIzNF0sWzk1MiwyNTRdLFs5NDcsMjUxXSxbOTc3LDIxMF0sWzk4MSwyMTRdLFs5NzAsMjI5XSxbMTA3OCwzMDddLFsxMTA4LDI2Nl0sWzEwNzcsMjQ1XSxbMTA5MiwyMjRdLFsxMDg4LDIyMV1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzUyNSwxMjY2XSxbNTA4LDEyNTRdLFs0OTUsMTI2M10sWzQ1MCwxMjY5XSxbNDI5LDEyNTBdLFs0MTQsMTIxMl1dXX1dfSx7InRpcG8iOiJTb3JyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNDE0LDEyMTJdLFs0MzMsMTE1OF0sWzQ5MCwxMDc3XSxbNTM5LDEwMzBdLFs2NjgsOTQzXSxbOTAyLDg1Ml0sWzEwMTQsODI5XSxbMTAyNyw4MjFdLFsxMDM2LDgyNV0sWzEwNDksODE4XSxbMTEzMSw4MjJdLFsxMjE3LDg1NV0sWzEyMzQsODIxXSxbMTI4MSw3NzZdLFsxMzcxLDcyOF0sWzE0NDcsNzEyXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzQ1MywzNjBdLFs0MzMsMzg3XSxbNDI3LDM1OF0sWzQzMywzMTZdLFs0MjAsMjc2XSxbNDE4LDIzN11dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1OTcsMzg2XSxbNDY3LDQwMV0sWzQ1OCwzOTNdLFs0NTMsMzYwXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzQyNiwyMDVdLFs0NDgsMzEyXSxbNDQ0LDI3MF0sWzQ1MywyNTZdLFs0NzYsMjI4XSxbNTExLDIxOF0sWzUyMiwyMjNdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNDE4LDIzN10sWzQyNSwyMjddLFs0MjIsMjA5XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzYyNCwyMTJdLFs3NjAsMTk3XSxbODkwLDE4XSxbODg4LDBdXV19LHsidCI6IkwiLCJyIjpbW1s4NzEsMF0sWzQzOSw0OV0sWzQzOSw2MV0sWzQxOCw3MF0sWzQzMSwxMjVdLFs0MjksMTM3XSxbNDIwLDE0NV0sWzQyNiwyMDVdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNjQyLDM4MF0sWzU5NywzODZdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNzc1LDM2NV0sWzY0MiwzODBdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNTIyLDIyM10sWzU3NSwyMTddXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNTc1LDIxN10sWzYyNCwyMTJdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMTAzNSwyOF0sWzgwMCwzNTFdLFs4MDQsMzY0XSxbNzk0LDM3OF0sWzc3NSwzNjVdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMTA4OCwyMjFdLFsxMDkxLDIxN11dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxMDkxLDIxN10sWzEwOTksMjIzXSxbMTEyMSwyMDBdLFsxMTE4LDE2Nl1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxMTE3LDE2M10sWzExMTgsMTY2XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzExMTcsMTYzXSxbMTExNCwxMjNdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxNjUzLDcxNl0sWzE2ODIsODUyXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzExMTQsMTIzXSxbMTEwOSw3Nl0sWzEwMzgsMjVdLFsxMDM1LDI4XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzE3NzYsODMxXSxbMTc4Niw4ODFdLFsxNzcyLDg4NF0sWzE3NTksODIzXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzE2ODcsNzY0XSxbMTczMyw3NTRdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxNzMzLDc1NF0sWzE3NDMsNzY2XSxbMTc1OSw4MjNdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxNzc2LDgzMV0sWzE3NzksODE5XSxbMTc1OCw3MzldLFsxNzMzLDczNF0sWzE3MzAsNzI0XV1dfV19LHsidGlwbyI6IlNvcnJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxNzMwLDcyNF0sWzE3NDYsNjkxXSxbMTc5Myw2NTZdLFsxODI2LDYzOF0sWzE4OTgsNjE4XSxbMTk4OSw2MjFdLFsyMDQ5LDYzNl0sWzIxMjUsNjc1XSxbMjE1MCw2OTldXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxMjY0LDk2Nl0sWzEzMDgsOTU3XSxbMTMxNiw5NjldLFsxMzA3LDk3OV0sWzEyODEsOTg3XSxbMTIzNyw5ODddLFsxMjI2LDEwMDBdLFsxMTY5LDEwMDRdLFsxMTU3LDk5NF0sWzExNjgsOTgyXSxbMTI2NCw5NjZdXV19XX0seyJ0aXBvIjoiU29ycmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzE0NDcsNzEyXSxbMTQ5NCw3MTBdLFsxNTE4LDcwMl0sWzE1NTQsNzA1XSxbMTU2Nyw2OThdLFsxNTc1LDcwNF0sWzE2MjksNzAzXSxbMTY1Myw3MTZdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMTY5OSw4NTldLFsxNzA3LDg5OV0sWzE2OTMsOTAyXSxbMTY4Miw4NTJdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1sxNjk5LDg1OV0sWzE2ODMsNzc0XSxbMTY4Nyw3NjRdXV19XX0seyJ0aXBvIjoiU29ycmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzQzMzAsNjkwXSxbNDQ1Niw2NTddLFs0NDk4LDY1NV0sWzQ1ODUsNjc3XSxbNDY0NSw2ODJdLFs0NjU1LDY5MF0sWzQ2NzcsNjkxXSxbNDcwNSw3MTRdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s0NzA1LDcxNF0sWzQ2OTcsODE0XSxbNDY5OCw4NThdLFs0NzA1LDg0NV1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzQ3MDUsODQ1XSxbNDcxMiw4MzNdLFs0NzE2LDgwM10sWzQ3MjQsNjc4XV1dfV19LHsidGlwbyI6IlNvcnJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s0NzI0LDY3OF0sWzQ3NzcsNjY2XSxbNDgyMyw2NjZdLFs1MDY1LDcyOV0sWzUwODEsNzQxXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNTE0Myw5NzZdLFs1MTA3LDk4NF0sWzUwOTMsOTk0XSxbNTAzNCw5OTZdLFs1MDI0LDEwMDVdLFs1MDM2LDEwMTZdLFs1MDU3LDEwMTZdLFs1MDkxLDEwMTBdLFs1MDk1LDEwMDNdLFs1MTQ5LDk5OV0sWzUxNzEsOTg5XSxbNTE4Niw5OTFdLFs1MjE0LDk2N10sWzUxODMsOTY2XSxbNTE0Myw5NzZdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1MDc2LDc5OF0sWzUwNTUsOTU5XSxbNTA2MCw5NjhdLFs1MDczLDk2MF0sWzUwNzgsOTIyXSxbNTA4NCw5MjFdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNTA5NCw4NzldLFs1MDkwLDg5Ml0sWzUxMDAsODk1XSxbNTA5Miw5MjNdLFs1MDg0LDkyMV1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzUwOTQsODc5XSxbNTExMCw4MjhdLFs1MTU1LDgzM11dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzUwODEsNzQxXSxbNTA3Niw3OThdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1MTYzLDgzNV0sWzUxNzgsODM3XSxbNTE3MSw4ODBdLFs1MTU1LDg3OF0sWzUxNDksODgzXSxbNTE1Niw4OTVdLFs1MTk1LDg5OV0sWzUxOTgsOTA3XSxbNTIzOSw5MDRdLFs1MzYxLDkyMV0sWzUzNjcsOTM0XSxbNTM2NSw5NjRdLFs1MzczLDk4MF0sWzU0MjIsOTg1XSxbNTQxNywxMDY5XSxbNTQyMCwxMDgwXSxbNTQzNCwxMDg5XSxbNTQ1MCwxMDc2XSxbNTQ1NiwxMDU2XSxbNTQ1MiwxMDIxXSxbNTQ1OSw5NjBdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNTE2Myw4MzVdLFs1MTU1LDgzM11dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU1MDcsOTQ5XSxbNTUwNyw5OTRdLFs1NDk3LDEwMDZdLFs1NDkxLDEwMzddLFs1NDkxLDEwNTJdLFs1NDk4LDEwNjVdLFs1NTI3LDEwNjNdLFs1NTI5LDEwNDBdLFs1NTU3LDEwMzJdLFs1NTI3LDEwMThdLFs1NTI5LDk3NV1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1NTA3LDk0OV0sWzU0NTksOTYwXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNTY0NCwxMDE0XSxbNTYyMywxMDEyXSxbNTU4OSwxMDIxXSxbNTU3MywxMDMxXSxbNTU2NSwxMDUwXSxbNTU3MCwxMDU0XSxbNTU5MCwxMDQzXSxbNTYxNiwxMDIyXSxbNTY0OCwxMDIxXSxbNTY0NCwxMDE0XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU3MjAsOTM0XSxbNTcxNiw5MzBdLFs1Njc2LDkzOF0sWzU2NzksOTQ0XSxbNTY3MCw5NDJdLFs1Njc5LDk0OV0sWzU2MTcsOTU3XSxbNTYxMiw5ODBdLFs1NTk0LDk4MV0sWzU1OTAsOTc1XSxbNTYwNSw5NjBdLFs1NTI5LDk3NV1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1NTM4LDk4NF0sWzU1ODEsOTc1XSxbNTU4Miw5NzddLFs1NTM5LDk4Nl0sWzU1MzgsOTg0XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU2MjMsOTY2XSxbNTY2Miw5NThdLFs1NjYyLDk2MF0sWzU2MjQsOTY4XSxbNTYyMyw5NjZdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1Njc0LDEwMjFdLFs1NjU2LDEwNDNdLFs1NjM3LDEwNTJdLFs1NjI4LDEwNDddLFs1NjY5LDEwMTRdLFs1Njg4LDEwMTJdLFs1Njc0LDEwMjFdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1syMTQxLDgzOF0sWzIxMDMsODE5XSxbMjA5MCw4MjBdLFsyMDg2LDgzMF0sWzIwOTksODg0XSxbMjEyMyw5MDNdLFsyMjAyLDkyMl0sWzIyMTAsOTA1XSxbMjEzMyw4ODFdLFsyMTIwLDg2Nl0sWzIxMjUsODYwXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzI2NzQsODE5XSxbMjY2Niw4NzldLFsyNTg0LDg5OF0sWzI0NzMsOTEyXSxbMjM4NCw5MTVdLFsyMjQxLDkwNF0sWzIxNDEsODc3XSxbMjEyNSw4NjBdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMjE0MSw4MzhdLFsyMTUwLDgzOF0sWzIxNTMsODI5XSxbMjE1NCw4NDBdLFsyMTg5LDg1M10sWzIxOTIsODY1XSxbMjI3Niw4ODFdLFsyNDIxLDg4N10sWzI1MjYsODc4XSxbMjUyNSw4NjldLFsyNTMxLDg2OF0sWzI1MzIsODc2XSxbMjU1MCw4NzVdLFsyNTUyLDg2MV0sWzI1NDIsODU5XSxbMjU1Myw4NThdLFsyNTU2LDgzNV0sWzI1MjYsODMxXSxbMjUyMCw4MzZdLFsyNTIxLDgyOV0sWzI0MTYsODE2XSxbMjQxMyw4NDBdLFsyMzg2LDgzNl0sWzIzODgsODIwXSxbMjM4Miw4MjBdLFsyMzc5LDgzNl0sWzIzNDYsODMyXSxbMjM1NCw3NjldLFsyMzU2LDc1N10sWzI1NjIsNzgzXSxbMjU4NSw2MDddLFsyNTcxLDYwNV0sWzI1NzMsNTkxXSxbMjM1MCw1NjJdLFsyMzQ3LDU3Nl0sWzIzMzQsNTc0XSxbMjMxNiw3MTJdLFsyMjkyLDcwOV0sWzIyOTAsNzI0XSxbMjMxMCw3MjddLFsyMjk0LDc2Nl0sWzIyODUsNzY0XSxbMjI4NSw3ODhdLFsyMjMyLDc4MF0sWzIxOTMsNzY3XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzI2NDgsODA0XSxbMjY2NSw4MTFdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMjY3MCw2MzBdLFsyNjQ4LDgwNF1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzI2NzQsODE5XSxbMjcwOSw4MjRdLFsyNzE0LDgyMF1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzI3MTMsODEwXSxbMjY3Niw4MDVdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMjcxMyw4MTBdLFsyNzIwLDgxMl0sWzI3MTQsODIwXV1dfV19LHsidGlwbyI6IlNvcnJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1syNjcwLDYzMF0sWzI2NzEsNjE3XSxbMjY3OSw2MTBdLFsyNjg5LDYxM10sWzI3ODAsNTk2XSxbMjgzNSw1OTZdLFsyOTU4LDYyMV0sWzMwNDMsNjYzXSxbMzA1NCw2NzhdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1szMDg1LDgwMV0sWzMwNzcsODA1XSxbMzA3MSw4MjNdLFszMDc3LDgzOF0sWzMxMDMsODM4XSxbMzExMCw4MjZdLFszMTA1LDc5M10sWzMxMTksNjk5XV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbMzA1NCw2NzhdLFszMDQ0LDc2Nl1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1szMDg1LDgwMV0sWzMwOTAsNzYyXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbMzEwMyw2NzBdLFszMDg4LDc0NV0sWzMwOTAsNzYyXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzMwODQsNjY3XSxbMzA2OSw2NjVdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMzEwMyw2NzBdLFszMDg0LDY2N11dXX1dfSx7InRpcG8iOiJTb3JyYSIsImciOlt7InQiOiJMIiwiciI6W1tbMzExOSw2OTldLFszMjE3LDY2Ml0sWzM1NTgsNjUyXSxbMzYwMyw2NjJdLFszNzIzLDcyOF1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzM3MjMsNzI4XSxbMzcwNyw4NDRdLFszNjg5LDg4NV0sWzM2OTcsOTA0XSxbMzcwNSw5MDldLFszNzMxLDg5OV0sWzM3MjUsODk0XSxbMzcyNyw4ODBdLFszNzIxLDg3Nl1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzM3NTMsODc2XSxbMzc0MSw4OTldLFszNzQ2LDkxM10sWzM3NTYsOTE4XSxbMzc4Myw4OTldLFszNzcyLDg2Ml0sWzM3OTAsNzQxXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzM3NTMsODc2XSxbMzc1Nyw4NTFdLFszNzQ0LDg0N11dXX1dfSx7InRpcG8iOiJSb2NhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1szOTM3LDcwNV0sWzM5NzcsNjkxXSxbNDAyMyw2OTRdLFs0MDI1LDY4NV1dXX1dfSx7InRpcG8iOiJTb3JyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNDAyNSw2ODVdLFs0MTA1LDY5MF0sWzQxODAsNzAzXSxbNDE4OCw3MTJdLFs0MjAyLDcxMV0sWzQyMTQsNzI1XSxbNDIyNSw3MjJdLFs0MjYwLDczNl0sWzQyNzIsNzUyXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNDI3Miw3NTJdLFs0MjUyLDg3Nl0sWzQyNTIsOTAwXSxbNDI1Nyw5MDldLFs0MjY3LDg3OF1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s0Mjc0LDg3OV0sWzQyNjcsODc4XV1dfV19LHsidGlwbyI6IlNvcnJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1szNzkwLDc0MV0sWzM4NjMsNzExXSxbMzkzNyw3MDVdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMzAzOCw4MTJdLFszMDQ0LDc2Nl1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzMwMzgsODEyXSxbMzAyOSw4MTVdLFszMDMzLDgzMV0sWzMwNDcsODM1XSxbMzA2NCw4MjVdLFszMDYzLDgwMF0sWzMwNTYsNzkyXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzQyODQsODgwXSxbNDI3NCw4NzldXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s0Mjg0LDg4MF0sWzQyODUsOTA3XSxbNDI5Niw5MDBdLFs0MzA4LDc2N10sWzQzMjEsNzI1XSxbNDMxNyw3MTFdLFs0MzMwLDY5MF1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1szMDYwLDc2MF0sWzMwNTYsNzkyXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbMzA2MCw3NjBdLFszMDczLDY5MV0sWzMwNjksNjY1XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzI2NjUsODExXSxbMjY2Niw4MDRdLFsyNjc2LDgwNV1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1syMTkzLDc2N10sWzIxOTcsNzIwXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbMjE1MCw2OTldLFsyMTIzLDczM10sWzIxMzAsNzM0XSxbMjE1MCw3MDhdXV19XX0seyJ0aXBvIjoiU29ycmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzIxNTAsNzA4XSxbMjE3Nyw3MjBdLFsyMTk3LDcyMF1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzI5NzEsOTE5XSxbMjk3MSw5MDZdLFsyOTYzLDg5OF0sWzI5NDksODk4XSxbMjk0Myw5MDZdLFsyOTQ3LDkyNF0sWzI5NjcsOTI1XSxbMjk3MSw5MTldXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbMzc0NCw4NDddLFszNzI1LDg0NF0sWzM3MjEsODc2XV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNTY5NSwxMDIxXSxbNTY4MiwxMDMxXSxbNTY5NSwxMDQxXSxbNTY5MSwxMDQ4XSxbNTY5NywxMDUzXSxbNTgxNSwxMDI5XSxbNTg0MSwxMDExXSxbNTg1NCw5OTJdLFs1ODUyLDk3NV0sWzU4NDQsOTcyXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU2OTUsMTAyMV0sWzU3MDQsMTAwNF0sWzU3NjUsOTg1XSxbNTc3NSw5OTFdLFs1ODE5LDk3MV0sWzU4NDQsOTcyXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNTc2NSwxMDU2XSxbNTc2NCwxMDQ5XSxbNTc1NywxMDQ3XSxbNTc1MywxMDU5XSxbNTc3MCwxMDkwXSxbNTc3NSwxMDgzXSxbNTc2NSwxMDU2XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU2NzIsOTY0XSxbNTY3Miw5NTNdLFs1Njk1LDk0N10sWzU2OTcsOTYzXSxbNTY3Miw5NjRdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2MDQ0LDEwODFdLFs1OTI0LDExMDJdLFs1OTE2LDEwNzVdLFs1OTA2LDEwNjZdLFs1ODk4LDEwNzNdLFs1OTAyLDEwODhdLFs1ODYzLDEwOTldLFs1ODU3LDExMTZdLFs1ODY0LDExMzRdLFs1ODc1LDExNDFdLFs1OTA0LDExNDJdLFs1OTA5LDExMjldXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNTgwMyw5MDRdLFs1Nzc5LDkyOF0sWzU3MjAsOTM0XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU5MDksMTEyOV0sWzYwMDYsMTEwOV1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1ODg5LDg4Nl0sWzU4MDMsOTA0XV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNjAwNiwxMTA5XSxbNjAxNiwxMTE1XSxbNjAyNiwxMTA2XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzYzNTAsMTAzOF0sWzYwMjYsMTEwNl1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2MDQ0LDEwODFdLFs2MDY4LDEwNzZdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNjU1NSw5NTddLFs2MzEwLDg1NV0sWzYyNjksOTYyXSxbNjI1Niw5NTddLFs2MzAwLDg1MV0sWzYxOTEsODA2XSxbNjE5NSw3OTZdLFs2MjUzLDgyMV0sWzYzNTIsNTgzXSxbNjM1MSw1NjFdLFs2MjExLDU2OV0sWzYxOTksNTc4XSxbNjE5Myw1NzNdLFs2MTc4LDU5NF0sWzYxNjYsNTg3XSxbNjE2Miw1OTRdLFs2MTQzLDU3OV0sWzYxNTEsNTY2XSxbNjAyOSw1NDldLFs2MDIyLDYwN10sWzYxMTQsNTkwXSxbNjE0MSw2NDFdLFs2MTU5LDYxNV0sWzYxNzIsNjIyXSxbNjE1Niw2NDZdLFs2MTUxLDY0Ml0sWzYxNDYsNjQ5XSxbNjE2MSw2ODJdLFs2MTY0LDcxOF0sWzYxNTksNzU2XSxbNjE0NCw3NTRdLFs2MTQzLDc2MF0sWzYxNTgsNzYyXSxbNjE1OCw3NjhdLFs2MTQyLDc2Nl0sWzYxNDAsNzgxXSxbNjE1NSw3ODRdLFs2MTM5LDkxNF0sWzYxMjgsOTEzXSxbNjEwOCw4ODhdLFs2MTAyLDg5M10sWzYxMzUsOTM0XSxbNjEzMyw5NDZdLFs1OTc2LDk3OF0sWzU5ODEsMTAwMV1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzYxODAsMTA1Ml0sWzYwNjgsMTA3Nl1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2MTgwLDEwNTJdLFs2MjIwLDEwNDVdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2NDY3LDk5NF0sWzY0NjUsOTkwXSxbNjI1OCwxMDMxXSxbNjIyMCwxMDQ1XV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNjM1MCwxMDM4XSxbNjM0NywxMDQ5XSxbNjMzMSwxMDU2XSxbNjQxMiwxMDQwXSxbNjQzMywxMDI2XSxbNjQ1NCwxMDIzXSxbNjQ1NSwxMDE3XV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzY0NjcsOTk0XSxbNjU1Niw5NzZdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2NTcyLDEwMDVdLFs2NTk4LDEwMDBdLFs2NTg4LDk5MF1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzY1NTUsOTU3XSxbNjU1Niw5NzZdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNjU4OCw5OTBdLFs2NjIwLDk4M11dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzY1NzQsOTQ3XSxbNjU1OSw5MzVdXV19XX0seyJ0aXBvIjoiU29ycmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzY1NTksOTM1XSxbNjU1OSw5MTBdLFs2NTgzLDg1NV0sWzY2MTEsODIxXSxbNjYzOSw4MDFdLFs2NjczLDc4NV0sWzY4MjksNzQxXSxbNjg2Myw3MzldLFs2ODk3LDc0OV1dXX1dfSx7InRpcG8iOiJFc2N1bGxlcmEiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzY4OTcsNzQ5XSxbNjg5Niw3NzJdLFs2OTA4LDc3N11dXX1dfSx7InRpcG8iOiJTb3JyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNzAwMiw1NzldLFs3MDAwLDU5MF0sWzY5NjQsNjEyXSxbNjk0Miw2NTddLFs3MDIzLDYyNl0sWzcwNzAsNjI2XSxbNzA4NCw2MzVdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2OTg2LDQ4Ml0sWzY5ODYsNTY5XSxbNzAwMiw1NzldXV19XX0seyJ0aXBvIjoiUml1IiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2OTM4LDQ4Ml0sWzY5ODYsNDgyXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNzA4NCw2MzVdLFs3MDgzLDY1OV0sWzcwOTEsNjYxXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNzA5MSw2NjFdLFs3MTA1LDY1Ml0sWzcxMDQsNjE1XV1dfV19LHsidGlwbyI6IlNvcnJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s3MTA0LDYxNV0sWzcxNzcsNTk5XV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNTkzMSw5NTBdLFs1OTI3LDk0MV0sWzU5MTMsOTQ4XSxbNTkxMiw5NzNdLFs1OTIzLDk5NF0sWzU5NTQsOTk3XSxbNTk3MSwxMDEwXSxbNTk4MSwxMDAxXV1dfV19LHsidGlwbyI6Ik1vbGwiLCJnIjpbeyJ0IjoiTCIsInIiOltbWzU5MzEsOTUwXSxbNTkzOSw5NDhdLFs1OTQxLDk1N10sWzU5ODIsOTQ4XSxbNTk3Miw5MDFdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2OTA4LDc3N10sWzY5MTUsNzcwXSxbNjkxMyw3MjJdLFs2OTIwLDcwMF0sWzY5MjMsNTk3XSxbNjkyMyw1NzddLFs2OTEzLDU2Nl0sWzY5MTQsNTU5XSxbNjkyNCw1NzFdLFs2OTM0LDU2OV0sWzY5MzgsNDgyXV1dfV19LHsidGlwbyI6IkVzY3VsbGVyYSIsImciOlt7InQiOiJMIiwiciI6W1tbNTkwOSw5MTFdLFs1OTcyLDkwMV1dXX1dfSx7InRpcG8iOiJNb2xsIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s1OTA5LDkxMV0sWzU5MDMsODg0XSxbNTg4OSw4ODZdXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2NjIwLDk4M10sWzY2MjMsOTg5XSxbNjYzOCw5NzFdLFs2NjI4LDk1NF0sWzY1ODgsOTU3XSxbNjU3NCw5NDddXV19XX0seyJ0aXBvIjoiRXNjdWxsZXJhIiwiZyI6W3sidCI6IkwiLCJyIjpbW1s2NDg4LDEwMTBdLFs2NDY2LDEwMjddLFs2NTcyLDEwMDVdXV19XX0seyJ0aXBvIjoiTW9sbCIsImciOlt7InQiOiJMIiwiciI6W1tbNjQ1NSwxMDE3XSxbNjQ4OCwxMDEwXV1dfV19XSwicGxheWFzIjpbeyJjb2QiOiJTUyIsIm9yZGVuIjoxLCJub21icmUiOiJTYW50IFNlYmFzdGnDoCIsImciOlt7InQiOiJQIiwiciI6W1tbNDE2LDEyMDldLFs0MTAsMTE4MV0sWzQwNiwxMTc4XSxbNDAxLDExNzldLFs0MDYsMTIwN10sWzQyNiwxMjU0XSxbNDI3LDEyNTldLFs0MjAsMTI2NF0sWzM1MCwxMTQwXSxbMzc3LDEwODFdLFs0NTEsMTAzN10sWzQ0OSwxMDM0XSxbNDk4LDEwMDVdLFs1NjEsOTgwXSxbNTYzLDk4M10sWzY0Niw5MzNdLFs2NTksOTU5XSxbNjM1LDk3MF0sWzUxOCwxMDU0XSxbNDUxLDExMjldLFs0MTYsMTIwOV1dXX0seyJ0IjoiUCIsInIiOltbWzY1OSw5NTldLFs2NDYsOTMzXSxbNjQ1LDkyMl0sWzcyMCw4NzhdLFs3NjEsODYwXSxbNzc4LDkwOV0sWzY1OSw5NTldXV19LHsidCI6IlAiLCJyIjpbW1s4MzAsODUwXSxbODQ2LDg0MV0sWzg0OSw4NDZdLFs5MDIsODIyXSxbOTEwLDg1Nl0sWzc3OCw5MDldLFs3NjEsODYwXSxbODEwLDg0MF0sWzgzMCw4NTBdXV19XSwibHgiOjQ4NiwibHkiOjEwNDd9LHsiY29kIjoiU00iLCJvcmRlbiI6Miwibm9tYnJlIjoiU2FudCBNaXF1ZWwiLCJnIjpbeyJ0IjoiUCIsInIiOltbWzk1NSw4NDBdLFs5MTAsODU2XSxbOTAyLDgyMl0sWzkwNCw4MTldLFs5MjUsODA5XSxbOTI2LDgxMV0sWzk0Niw4MDJdLFs5NDcsODA2XSxbMTA1MCw3NzBdLFsxMDUxLDc3M10sWzExMjQsNzU1XSxbMTEzOCw4MTNdLFsxMDU1LDgxOV0sWzk1NSw4NDBdXV19LHsidCI6IlAiLCJyIjpbW1sxMjE2LDg1OV0sWzEyMTksODg2XSxbMTIxNiw4ODddLFsxMjEwLDg1OF0sWzExMzgsODEzXSxbMTEyNCw3NTVdLFsxMTU2LDc0N10sWzExNTcsNzUwXSxbMTI2OCw3MjhdLFsxMjY4LDczMV0sWzEzMzksNzE1XSxbMTM0OSw3NTZdLFsxMjgyLDc3NF0sWzEyNTAsNzk5XSxbMTIxNiw4NTldXV19XSwibHgiOjEyNDMsImx5Ijo3NjJ9LHsiY29kIjoiQkMiLCJvcmRlbiI6Mywibm9tYnJlIjoiQmFyY2Vsb25ldGEiLCJnIjpbeyJ0IjoiUCIsInIiOltbWzEzNDksNzU2XSxbMTMzOSw3MTVdLFsxNDA0LDcwMF0sWzE0MDQsNjk2XSxbMTY3MCw2MzddLFsxNjgyLDY5Ml0sWzE2NTgsNjk5XSxbMTY1NSw3MDddLFsxNjU3LDcxMl0sWzE1OTUsNzAxXSxbMTUzNSw3MDJdLFsxNTEzLDcwNF0sWzEzNDksNzU2XV1dfV0sImx4IjoxNTA0LCJseSI6NjkwfSx7ImNvZCI6IlNSIiwib3JkZW4iOjQsIm5vbWJyZSI6IlNvbW9ycm9zdHJvIiwiZyI6W3sidCI6IlAiLCJyIjpbW1sxNzcwLDY3N10sWzE3NjQsNjg1XSxbMTczMyw3MzVdLFsxNzE4LDczNV0sWzE2OTUsNjMxXSxbMTkwOCw1ODNdLFsxOTE1LDYyNV0sWzE4NzYsNjMzXSxbMTc5Myw2NjJdLFsxNzcwLDY3N11dXX0seyJ0IjoiUCIsInIiOltbWzE5NjksNjE3XSxbMTkxNSw2MjVdLFsxOTA4LDU4M10sWzE5NjQsNTcxXSxbMTk2Niw1NzldLFsxOTkzLDU3OF0sWzE5OTgsNjIyXSxbMTk2OSw2MTddXV19LHsidCI6IlAiLCJyIjpbW1syMDU0LDYzNF0sWzE5OTgsNjIyXSxbMTk5Myw1NzhdLFsyMDM0LDU3OF0sWzIxMDUsNTg5XSxbMjA5OCw2NTddLFsyMDkwLDY1MF0sWzIwNTQsNjM0XV1dfSx7InQiOiJQIiwiciI6W1tbMjE3Nyw1OTldLFsyMTgwLDYxMF0sWzIxODgsNjE5XSxbMjIyMiw2MjVdLFsyMjAwLDY5N10sWzIxOTcsNzIyXSxbMjE0OSw3MDRdLFsyMDk4LDY1N10sWzIxMDUsNTg5XSxbMjE3Nyw1OTldXV19XSwibHgiOjIxNjEsImx5Ijo2NDJ9LHsiY29kIjoiTkkiLCJvcmRlbiI6NSwibm9tYnJlIjoiTm92YSBJY8OgcmlhIiwiZyI6W3sidCI6IlAiLCJyIjpbW1syNjY5LDYyOV0sWzI2NzYsNTMwXSxbMjc1Miw1MjBdLFsyNzk1LDUyMl0sWzI4MzIsNTI5XSxbMjg4NCw1NDZdLFsyOTgwLDU5OF0sWzMwMjYsNjE1XSxbMzA2NCw2MjRdLFszMDUzLDY3OF0sWzI5MzksNjE3XSxbMjkyMCw2MTFdLFsyODM4LDU5OF0sWzI3NzEsNjA0XSxbMjY2OSw2MjldXV19XSwibHgiOjI4MTUsImx5Ijo1NjB9LHsiY29kIjoiQkciLCJvcmRlbiI6Niwibm9tYnJlIjoiQm9nYXRlbGwiLCJnIjpbeyJ0IjoiUCIsInIiOltbWzMxMTcsNzEzXSxbMzEyMCw2ODNdLFszMTI1LDY3NF0sWzMxMjIsNjcyXSxbMzEyOCw2MzNdLFszMTY2LDYzNF0sWzMyMTEsNjI5XSxbMzI5OSw2MDZdLFszMzQ2LDU5OF0sWzMzNTEsNjYxXSxbMzI1NCw2NzRdLFszMTE3LDcxM11dXX0seyJ0IjoiUCIsInIiOltbWzM0MzMsNjUwXSxbMzM1MSw2NjFdLFszMzQ2LDU5OF0sWzM0MTcsNTk0XSxbMzQ5Myw2MDJdLFszNDg5LDY1Ml0sWzM0MzMsNjUwXV1dfSx7InQiOiJQIiwiciI6W1tbMzQ4OSw2NTJdLFszNDkzLDYwMl0sWzM2MTMsNjE4XSxbMzYwOSw2NThdLFszNDg5LDY1Ml1dXX0seyJ0IjoiUCIsInIiOltbWzM3MzgsNjM1XSxbMzcyNCw3MDZdLFszNjA5LDY1OF0sWzM2MTMsNjE4XSxbMzczOCw2MzVdXV19XSwibHgiOjM2ODgsImx5Ijo2NjR9LHsiY29kIjoiTUIiLCJvcmRlbiI6Nywibm9tYnJlIjoiTWFyIEJlbGxhIiwiZyI6W3sidCI6IlAiLCJyIjpbW1szNzg3LDc0Nl0sWzM3OTMsNjkyXSxbMzgzMyw2ODddLFszODMwLDcyOF0sWzM3ODcsNzQ2XV1dfSx7InQiOiJQIiwiciI6W1tbMzg2NCw3MTZdLFszODMwLDcyOF0sWzM4MzMsNjg3XSxbMzg0Miw2ODZdLFszODQwLDY3M10sWzM4NDYsNjcyXSxbMzg0Niw2NzddLFszODU4LDY3N10sWzM4NjIsNjgyXSxbMzg3Myw2ODZdLFszOTE5LDY4OF0sWzM5ODAsNjgzXSxbNDAxMSw2NzhdLFs0MDA5LDY2N10sWzQxNDIsNjQ4XSxbNDIxNiw2NTZdLFs0Mjk2LDY4Ml0sWzQyODcsNzQwXSxbNDE1Myw2OTddLFs0MDE5LDY5N10sWzM4NjQsNzE2XV1dfV0sImx4IjozODA2LCJseSI6NzE1fSx7ImNvZCI6Ik5NIiwib3JkZW4iOjgsIm5vbWJyZSI6Ik5vdmEgTWFyIEJlbGxhIiwiZyI6W3sidCI6IlAiLCJyIjpbW1s0MzE4LDY5NF0sWzQzMTIsNzAxXSxbNDMxNyw3MThdLFs0MzA2LDcwM10sWzQzMDgsNjgxXSxbNDM0Miw2NzldLFs0MzgxLDY2OV0sWzQzODIsNjgzXSxbNDMxOCw2OTRdXV19LHsidCI6IlAiLCJyIjpbW1s0NTAyLDYzNl0sWzQ1NjEsNjI2XSxbNDYxOSw2MjNdLFs0NzIwLDYzM10sWzQ3MTUsNjkzXSxbNDcxMCw2OTldLFs0NjYyLDY3MV0sWzQ2NDgsNjY3XSxbNDQ0Nyw2NzRdLFs0MzgyLDY4M10sWzQzODEsNjY5XSxbNDUwMiw2MzZdXV19XSwibHgiOjQ1NDQsImx5Ijo2NTB9LHsiY29kIjoiTEwiLCJvcmRlbiI6OSwibm9tYnJlIjoiTGxldmFudCIsImciOlt7InQiOiJQIiwiciI6W1tbNDcyMyw2OTFdLFs0NzIwLDY3Ml0sWzQ3MTYsNjgzXSxbNDcyMCw2MzNdLFs0NzYzLDY0MV0sWzQ3NjgsNjM5XSxbNDgyMiw2NDZdLFs0ODIxLDY0OF0sWzQ4MjYsNjQ5XSxbNDg1Niw2NTNdLFs0OTY0LDY2N10sWzQ5NjMsNjcyXSxbNTAyMCw2NzldLFs1MDE5LDY5Nl0sWzUwMjAsNjc5XSxbNTA5NSw2ODldLFs1MDg0LDc0NF0sWzUwMTcsNzEyXSxbNDkwMSw2NzFdLFs0ODg1LDY3MF0sWzQ3MjMsNjkxXV1dfV0sImx4Ijo0ODg2LCJseSI6NjYzfSx7ImNvZCI6IkJGIiwib3JkZW4iOjEwLCJub21icmUiOiJab25hIGRlIEJhbnlzIGRlbCBGw7JydW0iLCJnIjpbeyJ0IjoiUCIsInIiOltbWzU2MzcsMTAxM10sWzU2MjAsMTAxMl0sWzU2MDAsMTAyMV0sWzU1ODAsMTAyMV0sWzU1NjUsMTAxNV0sWzU1NjIsMTAyMF0sWzU1NDIsMTAyM10sWzU1MzcsMTAxOF0sWzU1MzQsMTAyMV0sWzU1MjYsMTAxMl0sWzU1MjksMTAwNl0sWzU1MzAsOTc2XSxbNTYwNSw5NjBdLFs1NTg5LDk3Ml0sWzU1OTQsOTgxXSxbNTYxMyw5ODBdLFs1NjE3LDk1OF0sWzU2NjksOTQ3XSxbNTY3Nyw5NTBdLFs1Njc5LDk0N10sWzU2NzEsOTQ1XSxbNTY3MCw5NDJdLFs1NjcyLDkzOV0sWzU2NzYsOTM5XSxbNTY3Nyw5NDRdLFs1Njc2LDkzOF0sWzU3MTYsOTMwXSxbNTY5Nyw5NTBdLFs1NjkzLDk0Nl0sWzU2NzAsOTU1XSxbNTY3NCw5NjZdLFs1Njk3LDk2M10sWzU2OTcsOTU0XSxbNTcxOSw5MzRdLFs1NzYwLDkyNl0sWzU3NzksOTI4XSxbNTc4Niw5MjRdLFs1ODAzLDkwNF0sWzU5MDMsODgzXSxbNTkxNiw5NDNdLFs1OTExLDk1Ml0sWzU5MTEsOTY0XSxbNTg1MCw5NzNdLFs1ODE5LDk3Ml0sWzU3NzUsOTkxXSxbNTc2NSw5ODZdLFs1NzA1LDEwMDRdLFs1Njk2LDEwMThdLFs1Njg2LDEwMDldLFs1NjY5LDEwMTNdLFs1NjY1LDEwMThdLFs1NjYwLDEwMTddLFs1NjU3LDEwMjBdLFs1NjM3LDEwMTNdXV19XSwibHgiOjU3MjgsImx5Ijo5Njd9LHsiY29kIjoiRk0iLCJvcmRlbiI6MTEsIm5vbWJyZSI6IkbDsnJ1bSIsImciOlt7InQiOiJQIiwiciI6W1tbNjYwNSw4MzVdLFs2NTYyLDkzNl0sWzY1MTYsOTA5XSxbNjQ5NSw4OTVdLFs2NDk3LDg5MV0sWzY0NjYsODY4XSxbNjQ2Myw4NzJdLFs2NDM3LDg1M10sWzY0OTksNzQ0XSxbNjUxNSw3MzldLFs2NTY4LDcyNV0sWzY4MDYsNjc0XSxbNjgyNyw3NDJdLFs2Njk4LDc4Ml0sWzY2MDUsODM1XV1dfV0sImx4Ijo2NjI1LCJseSI6NzYyfV0sInpvbmEiOlt7ImNvZCI6IkJDIiwiZyI6W3sidCI6IlAiLCJyIjpbW1sxNDA5LDEwMDVdLFsxMzQ5LDc1Nl0sWzE0NjksNzE4XSxbMTUzMCw5NzFdLFsxNDA5LDEwMDVdXV19LHsidCI6IlAiLCJyIjpbW1sxNDY5LDcxOF0sWzE1MjAsNzAyXSxbMTU5NCw3MDFdLFsxNjU2LDcxMV0sWzE2NTQsNzI1XSxbMTY3Nyw4NTJdLFsxNjgxLDg1NF0sWzE2ODcsODgyXSxbMTY3OCw4OTBdLFsxNjc5LDkwMV0sWzE2OTksOTIyXSxbMTUzMCw5NzFdLFsxNDY5LDcxOF1dXX1dfSx7ImNvZCI6IkJGIiwiZyI6W3sidCI6IlAiLCJyIjpbW1s1NjM3LDEwMTNdLFs1NjIwLDEwMTJdLFs1NjAwLDEwMjFdLFs1NTgwLDEwMjFdLFs1NTY1LDEwMTVdLFs1NTYyLDEwMjBdLFs1NTM0LDEwMjFdLFs1NTI2LDEwMTJdLFs1NTMwLDk3Nl0sWzU2MDUsOTYwXSxbNTU4OSw5NzJdLFs1NTk0LDk4MV0sWzU2MTMsOTgwXSxbNTYxNyw5NThdLFs1NjY5LDk0N10sWzU2NzcsOTUwXSxbNTY3OSw5NDddLFs1NjcwLDk0Ml0sWzU2NzIsOTM5XSxbNTY3Nyw5NDRdLFs1Njc2LDkzOF0sWzU3MTYsOTMwXSxbNTY5Nyw5NTBdLFs1NjkzLDk0Nl0sWzU2NzAsOTU1XSxbNTY3NCw5NjZdLFs1Njk3LDk2M10sWzU2OTcsOTU0XSxbNTcxOSw5MzRdLFs1NzYwLDkyNl0sWzU3NzksOTI4XSxbNTgwMyw5MDRdLFs1OTAzLDg4M10sWzU5MTYsOTQzXSxbNTkxMSw5NjRdLFs1ODUwLDk3M10sWzU4MTksOTcyXSxbNTc3NSw5OTFdLFs1NzY1LDk4Nl0sWzU3MDUsMTAwNF0sWzU2OTYsMTAxOF0sWzU2ODYsMTAwOV0sWzU2NTcsMTAyMF0sWzU2MzcsMTAxM11dXX1dfSx7ImNvZCI6IkJHIiwiZyI6W3sidCI6IlAiLCJyIjpbW1szMDc4LDkwN10sWzMxMTcsNzEzXSxbMzI1NCw2NzRdLFszMzUxLDY2MV0sWzMzNzMsOTA4XSxbMzE1NSw5MTBdLFszMDc4LDkwN11dXX0seyJ0IjoiUCIsInIiOltbWzM0MzMsNjUwXSxbMzQ4OSw2NTJdLFszNDY5LDkwN10sWzMzNzMsOTA4XSxbMzM1MSw2NjFdLFszNDMzLDY1MF1dXX0seyJ0IjoiUCIsInIiOltbWzM2MDksNjU4XSxbMzU4MCw5MDZdLFszNDY5LDkwN10sWzM0ODksNjUyXSxbMzYwOSw2NThdXV19LHsidCI6IlAiLCJyIjpbW1szNzI0LDcwNl0sWzM3MTEsODA5XSxbMzcwNyw5MDldLFszNjY3LDkwNV0sWzM1ODAsOTA2XSxbMzYwOSw2NThdLFszNzI0LDcwNl1dXX1dfSx7ImNvZCI6IkZNIiwiZyI6W3sidCI6IlAiLCJyIjpbW1s2NjI2LDk2NV0sWzY1OTcsOTY3XSxbNjU4Nyw5NTJdLFs2NTYyLDkzNl0sWzY2MDUsODM1XSxbNjY5OCw3ODJdLFs2ODUwLDczNV0sWzY4OTUsNzM5XSxbNjg5NCw3NzhdLFs2OTAzLDc3OF0sWzY5NDEsOTA4XSxbNjczMyw5OTldLFs2NjYxLDEwMTddLFs2NjI2LDk2NV1dXX1dfSx7ImNvZCI6IkxMIiwiZyI6W3sidCI6IlAiLCJyIjpbW1s0NzEwLDg0OV0sWzQ3MjQsNjkxXSxbNDg5NSw2NzBdLFs0OTYxLDY5MF0sWzUwNTYsNzMxXSxbNTAzNSw5NDZdLFs0OTk4LDkzNl0sWzUwMDgsODEzXSxbNDk5OCw5MzddLFs0OTA4LDkxNl0sWzQ4NDEsOTA3XSxbNDY5Nyw4OThdLFs0NzEwLDg0OV1dXX0seyJ0IjoiUCIsInIiOltbWzUwODAsNzY3XSxbNTA1Niw5NTJdLFs1MDM1LDk0Nl0sWzUwNTYsNzMxXSxbNTA4NCw3NDRdLFs1MDgwLDc2N11dXX1dfSx7ImNvZCI6Ik1CIiwiZyI6W3sidCI6IlAiLCJyIjpbW1szNzgzLDgwMl0sWzM3ODcsNzQ2XSxbMzg1NSw3MThdLFs0MDE5LDY5N10sWzQwNTIsNjk3XSxbNDA3OCw5MTFdLFszODE4LDkzOV0sWzM3NjAsOTM5XSxbMzc4Myw4MDJdXV19LHsidCI6IlAiLCJyIjpbW1s0MTk4LDcxMV0sWzQxOTMsNzQwXSxbNDE5OCw3MTFdLFs0Mjg3LDc0MF0sWzQyNzUsNzUxXSxbNDI2NSw3ODNdLFs0MjYwLDg1Ml0sWzQyNTQsODU5XSxbNDI1MSw4NzVdLFs0MjU1LDkxM10sWzQwNzgsOTEwXSxbNDA1Miw2OTddLFs0MTUyLDY5Nl0sWzQxOTgsNzExXV1dfV19LHsiY29kIjoiTkkiLCJnIjpbeyJ0IjoiUCIsInIiOltbWzI2NjksNjI5XSxbMjc3MCw2MDNdLFsyODQxLDU5OF0sWzI5MzAsNjEyXSxbMzA1Myw2NzhdLFszMDI5LDg5N10sWzI3NTEsODQyXSxbMjY0NSw4MzBdLFsyNjY5LDYyOV1dXX1dfSx7ImNvZCI6Ik5NIiwiZyI6W3sidCI6IlAiLCJyIjpbW1s0Mjk4LDg4OF0sWzQzMDAsODEwXSxbNDMwOSw3NTddLFs0MzIxLDcyNF0sWzQzMTMsNjk4XSxbNDMyNyw2OTBdLFs0MzgyLDY4M10sWzQzODYsOTAxXSxbNDI4NSw5MTBdLFs0Mjk4LDg4OF1dXX0seyJ0IjoiUCIsInIiOltbWzQ2NDgsNjY3XSxbNDcxMCw2OTldLFs0NzA0LDcxOF0sWzQ2OTYsODU2XSxbNDY4OCw4OTddLFs0NTcyLDg4NV0sWzQzODYsOTAxXSxbNDM4Miw2ODNdLFs0NjQ4LDY2N11dXX1dfSx7ImNvZCI6IlNNIiwiZyI6W3sidCI6IlAiLCJyIjpbW1s5NTUsODQwXSxbMTA1NSw4MTldLFsxMTM3LDgxMl0sWzEyMTAsODU4XSxbMTIxNiw4ODddLFsxMjE5LDg4Nl0sWzEyMTYsODU3XSxbMTI1MCw3OTldLFsxMjgyLDc3NF0sWzEzNDksNzU2XSxbMTQwOSwxMDA1XSxbOTc2LDExMjhdLFs5MTAsODU2XSxbOTU1LDg0MF1dXX1dfSx7ImNvZCI6IlNSIiwiZyI6W3sidCI6IlAiLCJyIjpbW1sxNzkxLDg4Nl0sWzE3OTYsODcyXSxbMTc4Miw4NTddLFsxNzc2LDgyOF0sWzE3NzksODI0XSxbMTc3NCw4MTVdLFsxNzU5LDc0Ml0sWzE3NTEsNzM0XSxbMTczMyw3MzVdLFsxNzcwLDY3N10sWzE3ODgsNjY0XSxbMTgyNiw2NTBdLFsxODczLDg2N10sWzE3OTMsOTI0XSxbMTc5MSw4ODZdXV19LHsidCI6IlAiLCJyIjpbW1sxOTE1LDYyNV0sWzE5MjcsODMzXSxbMTg3Miw4NjZdLFsxODI2LDY1MF0sWzE5MTUsNjI1XV1dfSx7InQiOiJQIiwiciI6W1tbMTk5OCw2MjJdLFsyMDE3LDc4OV0sWzE5MjcsODMzXSxbMTkxNSw2MjVdLFsxOTU5LDYxN10sWzE5OTgsNjIyXV1dfSx7InQiOiJQIiwiciI6W1tbMjA1NCw2MzRdLFsyMDk4LDY1N10sWzIwODgsNzYwXSxbMjAxNyw3ODldLFsxOTk4LDYyMl0sWzIwNTQsNjM0XV1dfSx7InQiOiJQIiwiciI6W1tbMjEyMiw3MzJdLFsyMTE4LDczMV0sWzIwODgsNzYwXSxbMjA5OCw2NTddLFsyMTQ0LDY5OV0sWzIxMjIsNzMyXV1dfSx7InQiOiJQIiwiciI6W1tbMjE5Nyw3MjJdLFsyMTk1LDczM10sWzIyMDYsNzU0XSxbMjE5Miw3NjFdLFsyMjAwLDc2OF0sWzIxODcsNzY5XSxbMjE2Miw3NDZdLFsyMTMwLDczM10sWzIxNTQsNzA0XSxbMjE5Nyw3MjJdXV19XX0seyJjb2QiOiJTUyIsImciOlt7InQiOiJQIiwiciI6W1tbNDQ3LDEyNjldLFs0MzksMTI2N10sWzQxNiwxMjA5XSxbNDUxLDExMjldLFs0ODEsMTA5Nl0sWzU2NywxMjU3XSxbNTIwLDEyNThdLFs1MTMsMTI1M10sWzQ0NywxMjY5XV1dfSx7InQiOiJQIiwiciI6W1tbNTc3LDEwMTJdLFs2ODEsMTIyM10sWzU2NywxMjU3XSxbNDgxLDEwOTZdLFs1MTgsMTA1NF0sWzU3NywxMDEyXV1dfSx7InQiOiJQIiwiciI6W1tbNjM1LDk3MF0sWzY1OSw5NTldLFs3NzEsMTE4Nl0sWzY4MSwxMjIzXSxbNTc3LDEwMTJdLFs2MzUsOTcwXV1dfSx7InQiOiJQIiwiciI6W1tbNzc4LDkwOV0sWzg3NCwxMTU3XSxbNzcxLDExODZdLFs2NTksOTU5XSxbNzc4LDkwOV1dXX0seyJ0IjoiUCIsInIiOltbWzkxMCw4NTZdLFs5NzYsMTEyOF0sWzg3NCwxMTU3XSxbNzc4LDkwOV0sWzkxMCw4NTZdXV19XX1dLCJ2ZXJ0IjpbeyJ4Ijo1NCwieSI6OTMyLCJuIjoxLCJzaXMiOiJFREFSIEVMIFBSQVQgREUgTExPQlJFR0FUIn0seyJ4IjoyMzgsInkiOjc3NywibiI6Miwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6NTY5LCJ5Ijo3OTEsIm4iOjIsInNpcyI6IkVEQVIgRUwgUFJBVCBERSBMTE9CUkVHQVQifSx7IngiOjcxMCwieSI6NjczLCJuIjoxLCJzaXMiOiJFREFSIEVMIFBSQVQgREUgTExPQlJFR0FUIn0seyJ4Ijo2NzAsInkiOjU5NywibiI6MSwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6MTg2LCJ5Ijo3OSwibiI6Miwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6MzQ3LCJ5Ijo1OSwibiI6MSwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6NDM2LCJ5Ijo1MCwibiI6Niwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6NzU2LCJ5IjoxMywibiI6NCwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6ODcyLCJ5IjoyMjgsIm4iOjEsInNpcyI6IkVEQVIgRUwgUFJBVCBERSBMTE9CUkVHQVQifSx7IngiOjExMjgsInkiOjIxNSwibiI6MSwic2lzIjoiRURBUiBFTCBQUkFUIERFIExMT0JSRUdBVCJ9LHsieCI6MTA2MSwieSI6MTQsIm4iOjYsInNpcyI6IkVEQVIgRUwgUFJBVCBERSBMTE9CUkVHQVQifSx7IngiOjMwOTcsInkiOjY3MywibiI6MTEsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4IjozNzQzLCJ5Ijo4ODQsIm4iOjEsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4Ijo0Mjc0LCJ5Ijo4ODYsIm4iOjQsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4Ijo1NDgwLCJ5Ijo5NTQsIm4iOjgsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4Ijo1OTEzLCJ5Ijo5MTgsIm4iOjEsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4Ijo2MTQwLCJ5Ijo4OTgsIm4iOjEsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4Ijo2MTU5LCJ5Ijo3NDgsIm4iOjEsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4Ijo2OTE4LCJ5Ijo2MDQsIm4iOjEsInNpcyI6IkVEQVIgQkVTw5JTIn0seyJ4IjoxNzA3LCJ5Ijo3NTcsIm4iOjgsInNpcyI6IkVEQVIgQkVTw5JTIn1dLCJtdWVzIjpbeyJjb2QiOiJOTSIsImRlbiI6Ik1pdGphIHBsYXRqYSIsIngiOjQ1MzAsInkiOjY2OX0seyJjb2QiOiJNQiIsImRlbiI6IkFjY8OpcyBwb2xpZXNwb3J0aXUiLCJ4Ijo0MTQwLCJ5Ijo3MjV9LHsiY29kIjoiQkciLCJkZW4iOiJNaXRqYSBwbGF0amEiLCJ4IjozNDEwLCJ5Ijo2MjV9LHsiY29kIjoiTkkiLCJkZW4iOiJNaXRqYSBwbGF0amEiLCJ4IjozMDM3LCJ5Ijo0NzB9LHsiY29kIjoiU1IiLCJkZW4iOiJIb3NwaXRhbCBkZWwgTWFyIiwieCI6MTg3NCwieSI6NjQxfSx7ImNvZCI6IlNNIiwiZGVuIjoiQ2FuIENvc3RhIiwieCI6MTA1OSwieSI6ODIzfSx7ImNvZCI6IlNTIiwiZGVuIjoiQ2x1YiBOYXRhY2nDsyBCYXJjZWxvbmEiLCJ4Ijo2ODUsInkiOjk0OX0seyJjb2QiOiJMTCIsImRlbiI6Ik1pdGphIHBsYXRqYSIsIngiOjQ5NTMsInkiOjY4M30seyJjb2QiOiJCRiIsImRlbiI6IkV4dHJlbSBkZSBMbGV2YW50IiwieCI6NTgxOCwieSI6OTA0fSx7ImNvZCI6IkJDIiwiZGVuIjoiQy8gQW5kcmVhIERvcmlhIiwieCI6MTg3NCwieSI6NjM5fV0sInBsdW1hIjpbeyJ0IjoiUCIsInIiOltbWzEyNjIsNjhdLFsxMjgyLDE1M10sWzEyODEsMjEyXSxbMTI2OCwyNzBdLFsxMjQ0LDMyM10sWzEyMTAsMzcyXSxbMTE0NCw0MjldLFsxMDYzLDQ2NV0sWzk3Niw0NzZdLFs5MTgsNDY5XSxbODY5LDQ1NF0sWzgxOCw0NzVdLFs4NDQsNTI2XSxbODYwLDU4M10sWzg2Miw2NzFdLFs4MzksNzU2XSxbNzkyLDgzMF0sWzc1MCw4NzFdLFs2NzcsOTEzXSxbNjA5LDk4OV0sWzU1OSwxMDIwXSxbNTA0LDEwNDFdLFs0MTcsMTA1Ml0sWzM1OSwxMDQ1XSxbMzAzLDEwMjddLFsyNDgsOTk1XSxbMTc4LDEwMjZdLFsxNTAsMTA3Ml0sWzE0NSwxMTcwXSxbMTEzLDEyNTJdLFs1OSwxMzIyXSxbMCwxMzY0XSxbMCw0NTVdLFsxMyw0NDldLFs3MSw0MzldLFsxNTksNDQ1XSxbMjM3LDQ3NV0sWzI2Myw0MTFdLFsyOTcsMzYzXSxbMzczLDMwMF0sWzIyNSwzMjBdLFsxNTgsMzE3XSxbNjQsMzQwXSxbMCwzMzZdLFswLDBdLFsxMjIzLDBdLFsxMjYyLDY4XV1dfSx7InQiOiJQIiwiciI6W1tbMTU4NSwxMDE4XSxbMTUyNiwxMDE2XSxbMTQ2OSwxMDA0XSxbMTQxNSw5ODBdLFsxMzY3LDk0Nl0sWzEzMjYsOTA0XSxbMTI5NSw4NTRdLFsxMjczLDc5OV0sWzEyNjMsNzQxXSxbMTI2NCw2ODNdLFsxMjc3LDYyNV0sWzEzMDEsNTcxXSxbMTMzNSw1MjNdLFsxMzc3LDQ4M10sWzE0MjcsNDUxXSxbMTQ4Miw0MzBdLFsxNTQwLDQyMF0sWzE1OTgsNDIxXSxbMTY1Niw0MzRdLFsxNzEwLDQ1N10sWzE3NTgsNDkxXSxbMTc5OCw1MzRdLFsxODMwLDU4M10sWzE4NTEsNjM4XSxbMTg2MSw2OTZdLFsxODYwLDc1NV0sWzE4NDcsODEyXSxbMTgyNCw4NjZdLFsxNzkwLDkxNF0sWzE3NDcsOTU1XSxbMTY5OCw5ODZdLFsxNjQzLDEwMDhdLFsxNTg1LDEwMThdXV19LHsidCI6IlAiLCJyIjpbW1syOTQ1LDkzNF0sWzI4ODcsOTI3XSxbMjgzMSw5MDldLFsyNzgwLDg4MF0sWzI3MzUsODQyXSxbMjY5OSw3OTZdLFsyNjcyLDc0M10sWzI2NTYsNjg2XSxbMjY1Miw2MjhdLFsyNjU5LDU2OV0sWzI2NzcsNTE0XSxbMjcwNiw0NjJdLFsyNzQ0LDQxOF0sWzI3OTEsMzgxXSxbMjg0MywzNTVdLFsyOTAwLDMzOV0sWzI5NTksMzM1XSxbMzAxNywzNDJdLFszMDczLDM2MF0sWzMxMjQsMzg5XSxbMzE2OSw0MjddLFszMjA1LDQ3M10sWzMyMzEsNTI2XSxbMzI0Nyw1ODJdLFszMjUyLDY0MV0sWzMyNDUsNzAwXSxbMzIyNiw3NTVdLFszMTk3LDgwN10sWzMxNTksODUxXSxbMzExMyw4ODhdLFszMDYwLDkxNF0sWzMwMDQsOTMwXSxbMjk0NSw5MzRdXV19LHsidCI6IlAiLCJyIjpbW1szNTYyLDExNDNdLFszNTA0LDExMzBdLFszNDUwLDExMDddLFszNDAyLDEwNzNdLFszMzYyLDEwMzBdLFszMzE4LDk1NF0sWzMyOTksODY4XSxbMzMwMCw4MDldLFszMzEzLDc1Ml0sWzMzNTIsNjczXSxbMzM5MCw2MjhdLFszNDM3LDU5Ml0sWzM0ODksNTY2XSxbMzU0Niw1NTBdLFszNjA0LDU0NV0sWzM2NjMsNTUyXSxbMzcxOSw1NzFdLFszNzcwLDYwMF0sWzM4MTQsNjM4XSxbMzg2NCw3MDddLFszOTIyLDYzMV0sWzM5OTMsNTgwXSxbNDA3Nyw1NTJdLFs0MTY1LDU1MF0sWzQyMjIsNTYyXSxbNDI3Niw1ODZdLFs0MzQ2LDY0MF0sWzQzODIsNjg2XSxbNDQwOSw3MzldLFs0NDI0LDc5NV0sWzQ0MjksODU0XSxbNDQyMiw5MTJdLFs0NDAzLDk2OF0sWzQzNzUsMTAyMF0sWzQzMzYsMTA2NF0sWzQyOTAsMTEwMF0sWzQyMzgsMTEyN10sWzQxODEsMTE0M10sWzQxMjIsMTE0N10sWzQwNjQsMTE0MF0sWzQwMDgsMTEyMl0sWzM5NTcsMTA5M10sWzM5MTIsMTA1NV0sWzM4NjMsOTg1XSxbMzgyNSwxMDQxXSxbMzc4MywxMDgxXSxbMzczMywxMTEzXSxbMzY1MCwxMTQxXSxbMzU2MiwxMTQzXV1dfSx7InQiOiJQIiwiciI6W1tbNTI5OSwxMjEzXSxbNTIxNCwxMTkwXSxbNTE2MiwxMTYxXSxbNTExOCwxMTIzXSxbNTA2NywxMDUxXSxbNTAzOSw5NjddLFs1MDM1LDkwOV0sWzUwNDIsODUwXSxbNTA2MCw3OTRdLFs1MDg5LDc0M10sWzUxNTAsNjc5XSxbNTIyNiw2MzZdLFs1MjgzLDYyMF0sWzUzNDEsNjE1XSxbNTQwMCw2MjNdLFs1NDU2LDY0MV0sWzU1MzQsNjkyXSxbNTU4Myw2NDNdLFs1NjMzLDYxMl0sWzU2ODcsNTkwXSxbNTc0Myw1ODBdLFs1Nzg2LDUxNF0sWzU4NTMsNDU2XSxbNTkwNSw0MzBdLFs1OTYyLDQxNF0sWzYwMjAsNDEwXSxbNjEwNyw0MjRdLFs2MTg2LDQ2NF0sWzYyNTAsNTI0XSxbNjI4MSw1NzRdLFs2MzAzLDYyOV0sWzYzMTMsNjg3XSxbNjMxMiw3NDZdLFs2MjkyLDgyMV0sWzYyOTMsODk1XSxbNjI4MCw5NTJdLFs2MjQxLDEwMzFdLFs2MTgwLDEwOTVdLFs2MTMwLDExMjddLFs2MDQ3LDExNTRdLFs1OTg4LDExNTldLFs1OTA2LDExNDVdLFs1ODQ5LDExNjhdLFs1NzYxLDExNzldLFs1NzAzLDExNzJdLFs1NjQ3LDExNTRdLFs1NTY4LDExMDNdLFs1NDk2LDExNjhdLFs1NDQzLDExOTVdLFs1Mzg3LDEyMTFdLFs1Mjk5LDEyMTNdXV19LHsidCI6IlAiLCJyIjpbW1s2NzY3LDg2NV0sWzY3MDgsODU4XSxbNjY1Miw4NDBdLFs2NjAxLDgxMV0sWzY1NTcsNzcyXSxbNjUyMCw3MjZdLFs2NDk0LDY3NF0sWzY0NzgsNjE3XSxbNjQ3Myw1NThdLFs2NDgxLDUwMF0sWzY0OTksNDQ0XSxbNjUyOCwzOTNdLFs2NTY2LDM0OF0sWzY2MTIsMzEyXSxbNjY2NSwyODVdLFs2NzIxLDI3MF0sWzY3ODAsMjY1XSxbNjgzOCwyNzJdLFs2ODk0LDI5MF0sWzY5NDYsMzE5XSxbNjk5MCwzNThdLFs3MDI2LDQwNF0sWzcwNTMsNDU2XSxbNzA2OSw1MTNdLFs3MDczLDU3Ml0sWzcwNjYsNjMwXSxbNzA0OCw2ODZdLFs3MDE5LDczN10sWzY5ODEsNzgyXSxbNjkzNCw4MThdLFs2ODgyLDg0NV0sWzY4MjUsODYwXSxbNjc2Nyw4NjVdXV19XSwicHJvdCI6eyJCQyI6eyJwY3QiOjk5LCJiIjoicm9qYSJ9LCJCRiI6eyJwY3QiOjEwMCwiYiI6InJvamEifSwiQkciOnsicGN0Ijo4MCwiYiI6InJvamEifSwiRk0iOnsicGN0IjozNiwiYiI6ImFtYXJpbGxhIn0sIkxMIjp7InBjdCI6NSwiYiI6ImFtYXJpbGxhIn0sIk1CIjp7InBjdCI6MTAwLCJiIjoicm9qYSJ9LCJOSSI6eyJwY3QiOjk1LCJiIjoicm9qYSJ9LCJOTSI6eyJwY3QiOjI4LCJiIjoiYW1hcmlsbGEifSwiU00iOnsicGN0IjoxMiwiYiI6ImFtYXJpbGxhIn0sIlNSIjp7InBjdCI6MjcsImIiOiJhbWFyaWxsYSJ9LCJTUyI6eyJwY3QiOjAsImIiOiJ2ZXJkZSJ9fSwicmVhbCI6eyIyMDIwLTA5LTA2Ijp7IlNTIjpbInZlcmRlIiwiIl0sIlNNIjpbInZlcmRlIiwiIl0sIkJDIjpbInZlcmRlIiwiIl0sIlNSIjpbInZlcmRlIiwiIl0sIk5JIjpbInZlcmRlIiwiIl0sIkJHIjpbInZlcmRlIiwiIl0sIk1CIjpbImFtYXJpbGxhIiwiZm9uZG8gcGVsaWdyb3NvIl0sIk5NIjpbInZlcmRlIiwiIl0sIkxMIjpbInZlcmRlIiwiIl0sIkZNIjpbInZlcmRlIiwiIl19LCIyMDIwLTA5LTA3Ijp7IlNTIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJTTSI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiQkMiOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIlNSIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJOSSI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiQkciOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIk1CIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YTsgZm9uZG8gcGVsaWdyb3NvIl0sIk5NIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJMTCI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiRk0iOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl19LCIyMDIwLTA5LTA4Ijp7IlNTIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJTTSI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiQkMiOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIlNSIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJOSSI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiQkciOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIk1CIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YTsgZXN0YWRvIGRlbCBtYXIiXSwiTk0iOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIkxMIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJGTSI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXX0sIjIwMjAtMDktMDkiOnsiU1MiOlsicm9qYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiU00iOlsicm9qYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiQkMiOlsicm9qYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiU1IiOlsicm9qYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiTkkiOlsiYW1hcmlsbGEiLCJlc3RhZG8gZGVsIG1hciJdLCJCRyI6WyJhbWFyaWxsYSIsImVzdGFkbyBkZWwgbWFyIl0sIk1CIjpbImFtYXJpbGxhIiwiZXN0YWRvIGRlbCBtYXI7IGZvbmRvIHBlbGlncm9zbyJdLCJOTSI6WyJhbWFyaWxsYSIsImVzdGFkbyBkZWwgbWFyIl0sIkxMIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YTsgZXN0YWRvIGRlbCBtYXIiXSwiRk0iOlsiYW1hcmlsbGEiLCJlc3RhZG8gZGVsIG1hciJdfSwiMjAyMC0wOS0xMCI6eyJTUyI6WyJyb2phIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJTTSI6WyJyb2phIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJCQyI6WyJyb2phIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJTUiI6WyJyb2phIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJOSSI6WyJyb2phIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJCRyI6WyJyb2phIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJNQiI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWE7IGVzdGFkbyBkZWwgbWFyIl0sIk5NIjpbImFtYXJpbGxhIiwiY2FsaWRhZCBkZWwgYWd1YSJdLCJMTCI6WyJhbWFyaWxsYSIsImNhbGlkYWQgZGVsIGFndWEiXSwiRk0iOlsiYW1hcmlsbGEiLCJjYWxpZGFkIGRlbCBhZ3VhIl19LCIyMDIwLTA5LTExIjp7IlNTIjpbInZlcmRlIiwiIl0sIlNNIjpbInZlcmRlIiwiIl0sIkJDIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIlNSIjpbInZlcmRlIiwiIl0sIk5JIjpbInZlcmRlIiwiIl0sIkJHIjpbInZlcmRlIiwiIl0sIk1CIjpbImFtYXJpbGxhIiwiZm9uZG8gcGVsaWdyb3NvIl0sIk5NIjpbInZlcmRlIiwiIl0sIkxMIjpbInZlcmRlIiwiIl0sIkZNIjpbInZlcmRlIiwiIl19LCIyMDIwLTA5LTEyIjp7IlNTIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIlNNIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIkJDIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIlNSIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIk5JIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIkJHIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIk1CIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIk5NIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIkxMIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl0sIkZNIjpbInJvamEiLCJjYWxpZGFkIGRlbCBhZ3VhIl19LCIyMDIwLTA5LTEzIjp7IlNTIjpbInZlcmRlIiwiIl0sIlNNIjpbInZlcmRlIiwiIl0sIkJDIjpbInZlcmRlIiwiIl0sIlNSIjpbInZlcmRlIiwiIl0sIk5JIjpbInZlcmRlIiwiIl0sIkJHIjpbInZlcmRlIiwiIl0sIk1CIjpbInZlcmRlIiwiIl0sIk5NIjpbInZlcmRlIiwiIl0sIkxMIjpbInZlcmRlIiwiIl0sIkZNIjpbInZlcmRlIiwiIl19fSwicmFpbiI6eyJENSI6W1siMjAyMC0wOS0wNlQwMDowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwMTozMCIsMC4wXSxbIjIwMjAtMDktMDZUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQwMzowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwNDozMCIsMC4wXSxbIjIwMjAtMDktMDZUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQwNjowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwNzozMCIsMC4wXSxbIjIwMjAtMDktMDZUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQwOTowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxMDozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQxMjowMCIsMC4wXSxbIjIwMjAtMDktMDZUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxMzozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQxNTowMCIsMC4wXSxbIjIwMjAtMDktMDZUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxNjozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQxODowMCIsMC4wXSxbIjIwMjAtMDktMDZUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxOTozMCIsMC4wXSxbIjIwMjAtMDktMDZUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQyMTowMCIsMC4wXSxbIjIwMjAtMDktMDZUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDIyOjAwIiwwLjFdLFsiMjAyMC0wOS0wNlQyMjozMCIsMC43XSxbIjIwMjAtMDktMDZUMjM6MDAiLDAuNl0sWyIyMDIwLTA5LTA2VDIzOjMwIiwwLjFdLFsiMjAyMC0wOS0wN1QwMDowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDA6MzAiLDAuM10sWyIyMDIwLTA5LTA3VDAxOjAwIiwwLjFdLFsiMjAyMC0wOS0wN1QwMTozMCIsMC4wXSxbIjIwMjAtMDktMDdUMDI6MDAiLDAuMV0sWyIyMDIwLTA5LTA3VDAyOjMwIiwwLjFdLFsiMjAyMC0wOS0wN1QwMzowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDM6MzAiLDAuMl0sWyIyMDIwLTA5LTA3VDA0OjAwIiwwLjFdLFsiMjAyMC0wOS0wN1QwNDozMCIsMC4wXSxbIjIwMjAtMDktMDdUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QwNjowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QwNzozMCIsMC4wXSxbIjIwMjAtMDktMDdUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QwOTowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QxMDozMCIsMC4wXSxbIjIwMjAtMDktMDdUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QxMjowMCIsMC4wXSxbIjIwMjAtMDktMDdUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QxMzozMCIsMC4wXSxbIjIwMjAtMDktMDdUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QxNTowMCIsMC4wXSxbIjIwMjAtMDktMDdUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QxNjozMCIsMC4wXSxbIjIwMjAtMDktMDdUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QxODowMCIsMS4wXSxbIjIwMjAtMDktMDdUMTg6MzAiLDAuMV0sWyIyMDIwLTA5LTA3VDE5OjAwIiwwLjNdLFsiMjAyMC0wOS0wN1QxOTozMCIsNy4xXSxbIjIwMjAtMDktMDdUMjA6MDAiLDQuMl0sWyIyMDIwLTA5LTA3VDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QyMTowMCIsMS40XSxbIjIwMjAtMDktMDdUMjE6MzAiLDAuMV0sWyIyMDIwLTA5LTA3VDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QyMjozMCIsMC4wXSxbIjIwMjAtMDktMDdUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwMDowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQwMTozMCIsMC4wXSxbIjIwMjAtMDktMDhUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwMzowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQwNDozMCIsMC4wXSxbIjIwMjAtMDktMDhUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwNjowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQwNzozMCIsMC4wXSxbIjIwMjAtMDktMDhUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwOTowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxMDozMCIsMC4wXSxbIjIwMjAtMDktMDhUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQxMjowMCIsMC4wXSxbIjIwMjAtMDktMDhUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxMzozMCIsMC4wXSxbIjIwMjAtMDktMDhUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQxNTowMCIsMC4wXSxbIjIwMjAtMDktMDhUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxNjozMCIsMC4wXSxbIjIwMjAtMDktMDhUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQxODowMCIsMC4wXSxbIjIwMjAtMDktMDhUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxOTozMCIsMC4wXSxbIjIwMjAtMDktMDhUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQyMTowMCIsMC4wXSxbIjIwMjAtMDktMDhUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQyMjozMCIsMC4wXSxbIjIwMjAtMDktMDhUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQwMDowMCIsMC4wXSxbIjIwMjAtMDktMDlUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQwMTozMCIsMC4wXSxbIjIwMjAtMDktMDlUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQwMzowMCIsMC4wXSxbIjIwMjAtMDktMDlUMDM6MzAiLDEuNl0sWyIyMDIwLTA5LTA5VDA0OjAwIiwwLjVdLFsiMjAyMC0wOS0wOVQwNDozMCIsMS4xXSxbIjIwMjAtMDktMDlUMDU6MDAiLDYuM10sWyIyMDIwLTA5LTA5VDA1OjMwIiw0LjRdLFsiMjAyMC0wOS0wOVQwNjowMCIsMC40XSxbIjIwMjAtMDktMDlUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDA3OjAwIiwwLjFdLFsiMjAyMC0wOS0wOVQwNzozMCIsMC4wXSxbIjIwMjAtMDktMDlUMDg6MDAiLDAuMV0sWyIyMDIwLTA5LTA5VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQwOTowMCIsMC4yXSxbIjIwMjAtMDktMDlUMDk6MzAiLDAuMl0sWyIyMDIwLTA5LTA5VDEwOjAwIiwwLjldLFsiMjAyMC0wOS0wOVQxMDozMCIsMS4yXSxbIjIwMjAtMDktMDlUMTE6MDAiLDAuNV0sWyIyMDIwLTA5LTA5VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQxMjowMCIsMC4wXSxbIjIwMjAtMDktMDlUMTI6MzAiLDAuMV0sWyIyMDIwLTA5LTA5VDEzOjAwIiwwLjVdLFsiMjAyMC0wOS0wOVQxMzozMCIsMC45XSxbIjIwMjAtMDktMDlUMTQ6MDAiLDAuNV0sWyIyMDIwLTA5LTA5VDE0OjMwIiwwLjNdLFsiMjAyMC0wOS0wOVQxNTowMCIsMTEuOF0sWyIyMDIwLTA5LTA5VDE1OjMwIiwwLjFdLFsiMjAyMC0wOS0wOVQxNjowMCIsMC4xXSxbIjIwMjAtMDktMDlUMTY6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDE3OjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQxNzozMCIsMC4wXSxbIjIwMjAtMDktMDlUMTg6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDE4OjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQxOTowMCIsMi45XSxbIjIwMjAtMDktMDlUMTk6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDIwOjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQyMDozMCIsMC4wXSxbIjIwMjAtMDktMDlUMjE6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDIxOjMwIiwwLjFdLFsiMjAyMC0wOS0wOVQyMjowMCIsMC4wXSxbIjIwMjAtMDktMDlUMjI6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDIzOjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQyMzozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDA6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDAwOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwMTowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDE6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDAyOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQwMjozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDM6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDAzOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwNDowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDQ6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDA1OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQwNTozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDY6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDA2OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwNzowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDc6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDA4OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQwODozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDk6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDA5OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxMDowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTA6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDExOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxMTozMCIsMC4wXSxbIjIwMjAtMDktMTBUMTI6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDEyOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxMzowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTM6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDE0OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxNDozMCIsMC4wXSxbIjIwMjAtMDktMTBUMTU6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDE1OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxNjowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTY6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDE3OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxNzozMCIsMS4xXSxbIjIwMjAtMDktMTBUMTg6MDAiLDAuNV0sWyIyMDIwLTA5LTEwVDE4OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxOTowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTk6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDIwOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQyMDozMCIsMC4wXSxbIjIwMjAtMDktMTBUMjE6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDIxOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQyMjowMCIsMC4wXSxbIjIwMjAtMDktMTBUMjI6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDIzOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQyMzozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDA6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDAwOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwMTowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDE6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDAyOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQwMjozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDM6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDAzOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwNDowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDQ6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDA1OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQwNTozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDY6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDA2OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwNzowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDc6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDA4OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQwODozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDk6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDA5OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxMDowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTA6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDExOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxMTozMCIsMC4wXSxbIjIwMjAtMDktMTFUMTI6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDEyOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxMzowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTM6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDE0OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxNDozMCIsMC4wXSxbIjIwMjAtMDktMTFUMTU6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDE1OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxNjowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTY6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDE3OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxNzozMCIsMC4wXSxbIjIwMjAtMDktMTFUMTg6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDE4OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxOTowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTk6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDIwOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQyMDozMCIsMC4wXSxbIjIwMjAtMDktMTFUMjE6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDIxOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQyMjowMCIsMC4wXSxbIjIwMjAtMDktMTFUMjI6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDIzOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQyMzozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDA6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDAwOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwMTowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDE6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDAyOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQwMjozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDM6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDAzOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwNDowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDQ6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDA1OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQwNTozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDY6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDA2OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwNzowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDc6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDA4OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQwODozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDk6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDA5OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxMDowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTA6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDExOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxMTozMCIsMC4wXSxbIjIwMjAtMDktMTJUMTI6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDEyOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxMzowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTM6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDE0OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxNDozMCIsMC4wXSxbIjIwMjAtMDktMTJUMTU6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDE1OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxNjowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTY6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDE3OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxNzozMCIsMC4wXSxbIjIwMjAtMDktMTJUMTg6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDE4OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxOTowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTk6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDIwOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQyMDozMCIsMC4wXSxbIjIwMjAtMDktMTJUMjE6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDIxOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQyMjowMCIsMC4wXSxbIjIwMjAtMDktMTJUMjI6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDIzOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQyMzozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDA6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDAwOjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwMTowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDE6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDAyOjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QwMjozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDM6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDAzOjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwNDowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDQ6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDA1OjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QwNTozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDY6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDA2OjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwNzowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDc6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDA4OjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QwODozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDk6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDA5OjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QxMDowMCIsMC4wXSxbIjIwMjAtMDktMTNUMTA6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDExOjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QxMTozMCIsMC4wXV0sIlg0IjpbWyIyMDIwLTA5LTA2VDAwOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwMDozMCIsMC4wXSxbIjIwMjAtMDktMDZUMDE6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDAxOjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQwMjowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDI6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDAzOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwMzozMCIsMC4wXSxbIjIwMjAtMDktMDZUMDQ6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDA0OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQwNTowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDU6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDA2OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwNjozMCIsMC4wXSxbIjIwMjAtMDktMDZUMDc6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDA3OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQwODowMCIsMC4wXSxbIjIwMjAtMDktMDZUMDg6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDA5OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQwOTozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTA6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDEwOjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQxMTowMCIsMC4wXSxbIjIwMjAtMDktMDZUMTE6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDEyOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxMjozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTM6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDEzOjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQxNDowMCIsMC4wXSxbIjIwMjAtMDktMDZUMTQ6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDE1OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxNTozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTY6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDE2OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQxNzowMCIsMC4wXSxbIjIwMjAtMDktMDZUMTc6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDE4OjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQxODozMCIsMC4wXSxbIjIwMjAtMDktMDZUMTk6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDE5OjMwIiwwLjBdLFsiMjAyMC0wOS0wNlQyMDowMCIsMC4wXSxbIjIwMjAtMDktMDZUMjA6MzAiLDAuMF0sWyIyMDIwLTA5LTA2VDIxOjAwIiwwLjBdLFsiMjAyMC0wOS0wNlQyMTozMCIsMC4wXSxbIjIwMjAtMDktMDZUMjI6MDAiLDAuMF0sWyIyMDIwLTA5LTA2VDIyOjMwIiwwLjldLFsiMjAyMC0wOS0wNlQyMzowMCIsMjEuOV0sWyIyMDIwLTA5LTA2VDIzOjMwIiwzLjhdLFsiMjAyMC0wOS0wN1QwMDowMCIsMC4xXSxbIjIwMjAtMDktMDdUMDA6MzAiLDIuMV0sWyIyMDIwLTA5LTA3VDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QwMTozMCIsMC4wXSxbIjIwMjAtMDktMDdUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDAyOjMwIiwwLjJdLFsiMjAyMC0wOS0wN1QwMzowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QwNDozMCIsMC4wXSxbIjIwMjAtMDktMDdUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QwNjowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDA3OjAwIiwwLjNdLFsiMjAyMC0wOS0wN1QwNzozMCIsMC4wXSxbIjIwMjAtMDktMDdUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QwOTowMCIsMC4wXSxbIjIwMjAtMDktMDdUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QxMDozMCIsMC4wXSxbIjIwMjAtMDktMDdUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QxMjowMCIsMC4wXSxbIjIwMjAtMDktMDdUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QxMzozMCIsMC4wXSxbIjIwMjAtMDktMDdUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QxNTowMCIsMC4wXSxbIjIwMjAtMDktMDdUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QxNjozMCIsMC4wXSxbIjIwMjAtMDktMDdUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QxODowMCIsMC4wXSxbIjIwMjAtMDktMDdUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDE5OjAwIiwwLjVdLFsiMjAyMC0wOS0wN1QxOTozMCIsMC41XSxbIjIwMjAtMDktMDdUMjA6MDAiLDMuMV0sWyIyMDIwLTA5LTA3VDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0wN1QyMTowMCIsMC42XSxbIjIwMjAtMDktMDdUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTA3VDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0wN1QyMjozMCIsMC4wXSxbIjIwMjAtMDktMDdUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTA3VDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwMDowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQwMTozMCIsMC4wXSxbIjIwMjAtMDktMDhUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwMzowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQwNDozMCIsMC4wXSxbIjIwMjAtMDktMDhUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwNjowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQwNzozMCIsMC4wXSxbIjIwMjAtMDktMDhUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQwOTowMCIsMC4wXSxbIjIwMjAtMDktMDhUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxMDozMCIsMC4wXSxbIjIwMjAtMDktMDhUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQxMjowMCIsMC4wXSxbIjIwMjAtMDktMDhUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxMzozMCIsMC4wXSxbIjIwMjAtMDktMDhUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQxNTowMCIsMC4wXSxbIjIwMjAtMDktMDhUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxNjozMCIsMC4wXSxbIjIwMjAtMDktMDhUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQxODowMCIsMC4wXSxbIjIwMjAtMDktMDhUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQxOTozMCIsMC4wXSxbIjIwMjAtMDktMDhUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0wOFQyMTowMCIsMC4wXSxbIjIwMjAtMDktMDhUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTA4VDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0wOFQyMjozMCIsMC4wXSxbIjIwMjAtMDktMDhUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTA4VDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQwMDowMCIsMC4wXSxbIjIwMjAtMDktMDlUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQwMTozMCIsMC4wXSxbIjIwMjAtMDktMDlUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQwMzowMCIsMC4wXSxbIjIwMjAtMDktMDlUMDM6MzAiLDEuM10sWyIyMDIwLTA5LTA5VDA0OjAwIiwxLjRdLFsiMjAyMC0wOS0wOVQwNDozMCIsMS4zXSxbIjIwMjAtMDktMDlUMDU6MDAiLDYuMV0sWyIyMDIwLTA5LTA5VDA1OjMwIiwxLjVdLFsiMjAyMC0wOS0wOVQwNjowMCIsMC4zXSxbIjIwMjAtMDktMDlUMDY6MzAiLDAuMV0sWyIyMDIwLTA5LTA5VDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQwNzozMCIsMC4yXSxbIjIwMjAtMDktMDlUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQwOTowMCIsMC43XSxbIjIwMjAtMDktMDlUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDEwOjAwIiwwLjZdLFsiMjAyMC0wOS0wOVQxMDozMCIsMS44XSxbIjIwMjAtMDktMDlUMTE6MDAiLDAuMV0sWyIyMDIwLTA5LTA5VDExOjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQxMjowMCIsMC4wXSxbIjIwMjAtMDktMDlUMTI6MzAiLDAuM10sWyIyMDIwLTA5LTA5VDEzOjAwIiwwLjNdLFsiMjAyMC0wOS0wOVQxMzozMCIsMC40XSxbIjIwMjAtMDktMDlUMTQ6MDAiLDAuNV0sWyIyMDIwLTA5LTA5VDE0OjMwIiw1LjZdLFsiMjAyMC0wOS0wOVQxNTowMCIsMC40XSxbIjIwMjAtMDktMDlUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQxNjozMCIsMC4wXSxbIjIwMjAtMDktMDlUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0wOVQxODowMCIsMC4wXSxbIjIwMjAtMDktMDlUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTA5VDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQxOTozMCIsMC4wXSxbIjIwMjAtMDktMDlUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDIwOjMwIiwxLjJdLFsiMjAyMC0wOS0wOVQyMTowMCIsMC40XSxbIjIwMjAtMDktMDlUMjE6MzAiLDAuMV0sWyIyMDIwLTA5LTA5VDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0wOVQyMjozMCIsMC4wXSxbIjIwMjAtMDktMDlUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTA5VDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwMDowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQwMTozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwMzowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQwNDozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwNjowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQwNzozMCIsMC4wXSxbIjIwMjAtMDktMTBUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQwOTowMCIsMC4wXSxbIjIwMjAtMDktMTBUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxMDozMCIsMC4wXSxbIjIwMjAtMDktMTBUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDExOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxMjowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxMzozMCIsMC4wXSxbIjIwMjAtMDktMTBUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxNTowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxNjozMCIsMC4wXSxbIjIwMjAtMDktMTBUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQxODowMCIsMC4wXSxbIjIwMjAtMDktMTBUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQxOTozMCIsMC4wXSxbIjIwMjAtMDktMTBUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0xMFQyMTowMCIsMC4wXSxbIjIwMjAtMDktMTBUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTEwVDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0xMFQyMjozMCIsMC4wXSxbIjIwMjAtMDktMTBUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTEwVDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwMDowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQwMTozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwMzowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQwNDozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwNjowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQwNzozMCIsMC4wXSxbIjIwMjAtMDktMTFUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQwOTowMCIsMC4wXSxbIjIwMjAtMDktMTFUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxMDozMCIsMC4wXSxbIjIwMjAtMDktMTFUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDExOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxMjowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxMzozMCIsMC4wXSxbIjIwMjAtMDktMTFUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxNTowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxNjozMCIsMC4wXSxbIjIwMjAtMDktMTFUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQxODowMCIsMC4wXSxbIjIwMjAtMDktMTFUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQxOTozMCIsMC4wXSxbIjIwMjAtMDktMTFUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0xMVQyMTowMCIsMC4wXSxbIjIwMjAtMDktMTFUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTExVDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0xMVQyMjozMCIsMC4wXSxbIjIwMjAtMDktMTFUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTExVDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwMDowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQwMTozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwMzowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQwNDozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwNjowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQwNzozMCIsMC4wXSxbIjIwMjAtMDktMTJUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQwOTowMCIsMC4wXSxbIjIwMjAtMDktMTJUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxMDozMCIsMC4wXSxbIjIwMjAtMDktMTJUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDExOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxMjowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTI6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDEzOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxMzozMCIsMC4wXSxbIjIwMjAtMDktMTJUMTQ6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDE0OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxNTowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTU6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDE2OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxNjozMCIsMC4wXSxbIjIwMjAtMDktMTJUMTc6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDE3OjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQxODowMCIsMC4wXSxbIjIwMjAtMDktMTJUMTg6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDE5OjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQxOTozMCIsMC4wXSxbIjIwMjAtMDktMTJUMjA6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDIwOjMwIiwwLjBdLFsiMjAyMC0wOS0xMlQyMTowMCIsMC4wXSxbIjIwMjAtMDktMTJUMjE6MzAiLDAuMF0sWyIyMDIwLTA5LTEyVDIyOjAwIiwwLjBdLFsiMjAyMC0wOS0xMlQyMjozMCIsMC4wXSxbIjIwMjAtMDktMTJUMjM6MDAiLDAuMF0sWyIyMDIwLTA5LTEyVDIzOjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwMDowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDA6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDAxOjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QwMTozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDI6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDAyOjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwMzowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDM6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDA0OjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QwNDozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDU6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDA1OjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwNjowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDY6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDA3OjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QwNzozMCIsMC4wXSxbIjIwMjAtMDktMTNUMDg6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDA4OjMwIiwwLjBdLFsiMjAyMC0wOS0xM1QwOTowMCIsMC4wXSxbIjIwMjAtMDktMTNUMDk6MzAiLDAuMF0sWyIyMDIwLTA5LTEzVDEwOjAwIiwwLjBdLFsiMjAyMC0wOS0xM1QxMDozMCIsMC4wXSxbIjIwMjAtMDktMTNUMTE6MDAiLDAuMF0sWyIyMDIwLTA5LTEzVDExOjMwIiwwLjBdXX0sImFuYWwiOltbIk5NIiwiMjAyMC0wOS0wNyIsIjIwMjAtMDktMDkiLDk2MCw0NjBdLFsiTk0iLCIyMDIwLTA5LTA4IiwiMjAyMC0wOS0xMCIsMjUwLDgwXSxbIk5NIiwiMjAyMC0wOS0wOSIsIjIwMjAtMDktMTEiLDE1MCw3MF0sWyJOTSIsIjIwMjAtMDktMTAiLCIyMDIwLTA5LTEyIiw2OTAsMzMwXSxbIk5NIiwiMjAyMC0wOS0xMSIsIjIwMjAtMDktMTMiLDUwLDMwXSxbIk5NIiwiMjAyMC0wOS0xMiIsIjIwMjAtMDktMTQiLDIwLDEwXSxbIk1CIiwiMjAyMC0wOS0wNyIsIjIwMjAtMDktMDkiLDc3MCwzOTBdLFsiTUIiLCIyMDIwLTA5LTA4IiwiMjAyMC0wOS0xMCIsMTgwLDEyMF0sWyJNQiIsIjIwMjAtMDktMDkiLCIyMDIwLTA5LTExIiwxMzAsNTBdLFsiTUIiLCIyMDIwLTA5LTEwIiwiMjAyMC0wOS0xMiIsNTMwLDUwMF0sWyJNQiIsIjIwMjAtMDktMTEiLCIyMDIwLTA5LTEzIiw5MCw0MF0sWyJNQiIsIjIwMjAtMDktMTIiLCIyMDIwLTA5LTE0IiwyMCwxMF0sWyJCRyIsIjIwMjAtMDktMDciLCIyMDIwLTA5LTA5IiwyMTAwLDkxMF0sWyJCRyIsIjIwMjAtMDktMDgiLCIyMDIwLTA5LTEwIiwyOTAsMTMwXSxbIkJHIiwiMjAyMC0wOS0wOSIsIjIwMjAtMDktMTEiLDM5MCwxNjBdLFsiQkciLCIyMDIwLTA5LTEwIiwiMjAyMC0wOS0xMiIsNzQwLDM0MF0sWyJCRyIsIjIwMjAtMDktMTEiLCIyMDIwLTA5LTEzIiwxMzAsNzBdLFsiQkciLCIyMDIwLTA5LTEyIiwiMjAyMC0wOS0xNCIsNDAsMjBdLFsiTkkiLCIyMDIwLTA5LTA3IiwiMjAyMC0wOS0wOSIsMTA0MCw1NDBdLFsiTkkiLCIyMDIwLTA5LTA4IiwiMjAyMC0wOS0xMCIsNDMwLDE1MF0sWyJOSSIsIjIwMjAtMDktMDkiLCIyMDIwLTA5LTExIiw1NjAsMjEwXSxbIk5JIiwiMjAyMC0wOS0xMCIsIjIwMjAtMDktMTIiLDExMDAsMzgwXSxbIk5JIiwiMjAyMC0wOS0xMSIsIjIwMjAtMDktMTMiLDEzMCw0MF0sWyJOSSIsIjIwMjAtMDktMTIiLCIyMDIwLTA5LTE0IiwyMCwxMF0sWyJTUiIsIjIwMjAtMDktMDciLCIyMDIwLTA5LTA5IiwyMjUwLDE0NjBdLFsiU1IiLCIyMDIwLTA5LTA4IiwiMjAyMC0wOS0xMCIsNjgwLDE3MF0sWyJTUiIsIjIwMjAtMDktMDkiLCIyMDIwLTA5LTExIiwxMjUwLDc4MF0sWyJTUiIsIjIwMjAtMDktMTAiLCIyMDIwLTA5LTEyIiwxNjkwLDc5MF0sWyJTUiIsIjIwMjAtMDktMTEiLCIyMDIwLTA5LTEzIiwzNTAsMTUwXSxbIlNSIiwiMjAyMC0wOS0xMiIsIjIwMjAtMDktMTQiLDMwLDEwXSxbIlNNIiwiMjAyMC0wOS0wNyIsIjIwMjAtMDktMDkiLDI5MjAsMTIwMF0sWyJTTSIsIjIwMjAtMDktMDgiLCIyMDIwLTA5LTEwIiw2NTAsMzEwXSxbIlNNIiwiMjAyMC0wOS0wOSIsIjIwMjAtMDktMTEiLDE5MTAsNjcwXSxbIlNNIiwiMjAyMC0wOS0xMCIsIjIwMjAtMDktMTIiLDEzMTAsNzMwXSxbIlNNIiwiMjAyMC0wOS0xMSIsIjIwMjAtMDktMTMiLDI0MCwxMTBdLFsiU00iLCIyMDIwLTA5LTEyIiwiMjAyMC0wOS0xNCIsNDAsMjBdLFsiU1MiLCIyMDIwLTA5LTA3IiwiMjAyMC0wOS0wOSIsMjgyMCwxMzQwXSxbIlNTIiwiMjAyMC0wOS0wOCIsIjIwMjAtMDktMTAiLDYwMCwzNDBdLFsiU1MiLCIyMDIwLTA5LTA5IiwiMjAyMC0wOS0xMSIsMjQ5MCwxMTIwXSxbIlNTIiwiMjAyMC0wOS0xMCIsIjIwMjAtMDktMTIiLDE2OTAsOTkwXSxbIlNTIiwiMjAyMC0wOS0xMSIsIjIwMjAtMDktMTMiLDE5MCwxMzBdLFsiU1MiLCIyMDIwLTA5LTEyIiwiMjAyMC0wOS0xNCIsNDAsMTBdLFsiTEwiLCIyMDIwLTA5LTA3IiwiMjAyMC0wOS0wOSIsNjAwLDM3MF0sWyJMTCIsIjIwMjAtMDktMDgiLCIyMDIwLTA5LTEwIiwxMTAsNjBdLFsiTEwiLCIyMDIwLTA5LTA5IiwiMjAyMC0wOS0xMSIsMTYwLDE0MF0sWyJMTCIsIjIwMjAtMDktMTAiLCIyMDIwLTA5LTEyIiwxMTEwLDQzMF0sWyJMTCIsIjIwMjAtMDktMTEiLCIyMDIwLTA5LTEzIiw2MCwyMF0sWyJMTCIsIjIwMjAtMDktMTIiLCIyMDIwLTA5LTE0IiwyMCwxMF0sWyJCRiIsIjIwMjAtMDktMDciLCIyMDIwLTA5LTA5Iiw1ODAsMjYwXSxbIkJGIiwiMjAyMC0wOS0wOCIsIjIwMjAtMDktMTAiLDE3MCwxMjBdLFsiQkYiLCIyMDIwLTA5LTA5IiwiMjAyMC0wOS0xMSIsMTUwLDcwXSxbIkJGIiwiMjAyMC0wOS0xMCIsIjIwMjAtMDktMTIiLDY3MCwzNTBdLFsiQkYiLCIyMDIwLTA5LTExIiwiMjAyMC0wOS0xMyIsNTAsMjBdLFsiQkYiLCIyMDIwLTA5LTEyIiwiMjAyMC0wOS0xNCIsMjAsMTBdLFsiQkMiLCIyMDIwLTA5LTA3IiwiMjAyMC0wOS0wOSIsMjExMCw3ODBdLFsiQkMiLCIyMDIwLTA5LTA4IiwiMjAyMC0wOS0xMCIsNDMwLDIwMF0sWyJCQyIsIjIwMjAtMDktMDkiLCIyMDIwLTA5LTExIiwyMzQwLDE3NjBdLFsiQkMiLCIyMDIwLTA5LTEwIiwiMjAyMC0wOS0xMiIsMTA1MCw1NTBdLFsiQkMiLCIyMDIwLTA5LTExIiwiMjAyMC0wOS0xMyIsNzcwLDM2MF0sWyJCQyIsIjIwMjAtMDktMTIiLCIyMDIwLTA5LTE0Iiw2MCwzMF1dLCJ3Ijo3MTc3LCJoIjoxODY0LCJub3J0aCI6WzAuNzg2OSwtMC42MTddLCJhbmciOjUxLjl9"), (c) => c.charCodeAt(0))));
+const MODE = /*MODE*/"alumno";   // "proyector" (sin bloqueos) o "alumno" (códigos, justificaciones y descarga)
+const ALUMNO = MODE === "alumno";
+const KEY = ALUMNO ? "po3-alumno-v1" : "po3-sala-v1";
+// Códigos de turno (solo versión alumno). Se guardan como hash para que no se lean a simple vista.
+const CODE_HASH = /*CODES*/{"turno-2": 132517603, "turno-3": 245340898, "revision": 1080442394};
+const NEXT = { "turno-1": "turno-2", "turno-2": "turno-3", "turno-3": "revision" };
+function hashCode(t) { let h = 5381; for (const c of t.trim().toUpperCase()) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h; }
+const TURNS = [
+  { id: "briefing", short: "Briefing", sub: "La práctica", t: null },
+  { id: "turno-1", short: "Turno 1", sub: "Lun 7 · 08:00", t: "2020-09-07T08:00", day: "Lunes 7 sep 2020" },
+  { id: "turno-2", short: "Turno 2", sub: "Mié 9 · 08:00", t: "2020-09-09T08:00", day: "Miércoles 9 sep 2020" },
+  { id: "turno-3", short: "Turno 3", sub: "Sáb 12 · 08:00", t: "2020-09-12T08:00", day: "Sábado 12 sep 2020" },
+  { id: "revision", short: "Turno 4", sub: "Revisión", t: "2020-09-13T12:00", day: "Revisión · 6–13 sep 2020" },
+];
+const FLAG_DAY = { "turno-1": "2020-09-07", "turno-2": "2020-09-09", "turno-3": "2020-09-12" };
+const NS = "http://www.w3.org/2000/svg";
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NAME = Object.fromEntries(DATA.playas.map((p) => [p.cod, p.nombre]));
+const ORDER = Object.fromEntries(DATA.playas.map((p) => [p.cod, p.orden]));
+const SHORT = { SS: "S. Sebastià", SM: "S. Miquel", BC: "Barceloneta", SR: "Somorrostro", NI: "N. Icària", BG: "Bogatell", MB: "Mar Bella", NM: "N. Mar Bella", LL: "Llevant", BF: "Banys Fòrum", FM: "Fòrum" };
+
+// ---------- estado ----------
+let state = { turn: "briefing", flagMode: "dec", day: "2020-09-07", dec: { "turno-1": {}, "turno-2": {}, "turno-3": {} },
+  nombre: "", just: {}, recursos: { barco: "", muestras: "" }, unlocked: ["briefing", "turno-1"] };
+try {
+  const s = JSON.parse(localStorage.getItem(KEY) || "null");
+  if (s) { for (const k of ["nombre", "just", "recursos", "unlocked"]) if (s[k]) state[k] = s[k]; if (s.dec) state.dec = Object.assign(state.dec, s.dec); }
+} catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ dec: state.dec, nombre: state.nombre, just: state.just, recursos: state.recursos, unlocked: state.unlocked })); } catch (e) {} };
+const isOpen = (id) => !ALUMNO || state.unlocked.includes(id);
+const readOnly = (k) => ALUMNO && NEXT[k] && state.unlocked.includes(NEXT[k]);
+
+// ---------- mapa ----------
+const map = $("#map");
+map.setAttribute("viewBox", `0 0 ${DATA.w} ${DATA.h}`);
+const g = (cls) => { const e = document.createElementNS(NS, "g"); if (cls) e.setAttribute("class", cls); map.appendChild(e); return e; };
+const pathOf = (geoms) => geoms.map((x) => x.r.map((r) => "M" + r.map((p) => p.join(",")).join("L") + (x.t === "P" ? "Z" : "")).join("")).join("");
+function el(tag, attrs, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
+
+const gZona = g(), gCoast = g(), gPluma = g(), gBeach = g(), gVert = g(), gMues = g(), gLab = g(), gDeco = g();
+DATA.zona.forEach((z) => el("path", { d: pathOf(z.g), fill: "var(--sea)", stroke: "none" }, gZona));
+DATA.coast.forEach((c) => {
+  const sand = c.tipo === "Sorra";
+  el("path", { d: pathOf(c.g), fill: "none", stroke: sand ? "var(--sand)" : "var(--rock)", "stroke-width": sand ? 14 : 9, "stroke-linejoin": "round", "stroke-linecap": "round" }, gCoast);
+});
+el("path", { d: pathOf(DATA.pluma), fill: "var(--plume)", stroke: "var(--vert)", "stroke-width": 6, "stroke-dasharray": "30 20" }, gPluma);
+const beachEls = {};
+DATA.playas.forEach((p) => {
+  const e = el("path", { d: pathOf(p.g), class: "beach", fill: "var(--sand)", stroke: "var(--ink)", "stroke-width": 3, "stroke-opacity": .35 }, gBeach);
+  e.appendChild(document.createElementNS(NS, "title")).textContent = p.nombre;
+  beachEls[p.cod] = e;
+  e.addEventListener("click", () => cycle(p.cod));
+  const lx = p.lx, ly = p.ly - 260;
+  const lab = el("circle", { cx: lx, cy: ly, r: 78, fill: "var(--ink)", class: "blab" }, gLab);
+  lab.addEventListener("click", () => cycle(p.cod));
+  const t = el("text", { x: lx, y: ly + 26, "text-anchor": "middle", "font-size": 76, "font-family": "IBM Plex Mono, monospace", "font-weight": 600, fill: "var(--surface)" }, gLab);
+  t.textContent = p.orden;
+});
+DATA.vert.forEach((v) => el("circle", { cx: v.x, cy: v.y, r: 32 + v.n * 7, fill: "var(--vert)", "fill-opacity": .85, stroke: "var(--surface)", "stroke-width": 8 }, gVert));
+DATA.mues.forEach((m) => el("path", { d: `M${m.x},${m.y - 70}L${m.x + 62},${m.y + 42}L${m.x - 62},${m.y + 42}Z`, fill: "var(--mues)", stroke: "var(--surface)", "stroke-width": 8 }, gMues));
+// escala y norte
+el("rect", { x: 250, y: DATA.h - 170, width: 1000, height: 26, fill: "var(--ink)" }, gDeco);
+const sc = el("text", { x: 750, y: DATA.h - 200, "text-anchor": "middle", "font-size": 90, "font-family": "IBM Plex Mono, monospace", fill: "var(--ink)" }, gDeco); sc.textContent = "1 km";
+// norte: el mapa está girado para poner la costa horizontal; la flecha apunta al norte real
+const [nx, ny] = DATA.north, cx = DATA.w - 420, cy = DATA.h - 330, Lh = 170, px = -ny, py = nx;
+el("path", { d: `M${cx + nx * Lh},${cy + ny * Lh}L${cx - nx * Lh * .55 + px * 70},${cy - ny * Lh * .55 + py * 70}L${cx - nx * Lh * .55 - px * 70},${cy - ny * Lh * .55 - py * 70}Z`, fill: "var(--ink)" }, gDeco);
+const nn = el("text", { x: cx + nx * (Lh + 110), y: cy + ny * (Lh + 110) + 35, "text-anchor": "middle", "font-size": 100, "font-family": "IBM Plex Sans Condensed, sans-serif", "font-weight": 700, fill: "var(--ink)" }, gDeco); nn.textContent = "N";
+
+const toggles = { "#t-zona": gZona, "#t-vert": gVert, "#t-mues": gMues, "#t-pluma": gPluma };
+for (const k in toggles) { const cb = $(k); const f = () => toggles[k].style.display = cb.checked ? "" : "none"; cb.addEventListener("change", f); f(); }
+
+function flagColor(f) { return f === "verde" ? "var(--flag-g)" : f === "amarilla" ? "var(--flag-y)" : f === "roja" ? "var(--flag-r)" : "var(--sand)"; }
+function paintMap() {
+  const t = state.turn; let src = {}; let title = "Frente litoral de Barcelona";
+  if (state.flagMode === "prot") { for (const c in DATA.prot) src[c] = DATA.prot[c].b; title = "Bandera según el protocolo (lluvia del 6–7/09)"; }
+  else if (state.flagMode === "real") { const d = state.day; const r = DATA.real[d] || {}; for (const c in r) src[c] = r[c][0]; title = `Banderas reales · ${fmtDay(d)} (primer parte de la mañana)`; }
+  else { const k = t === "revision" ? "turno-3" : t; src = state.dec[k] || {}; title = k in state.dec ? `Decisión de la clase · ${TURNS.find((x) => x.id === k).short}` : "Frente litoral de Barcelona"; }
+  for (const c in beachEls) beachEls[c].setAttribute("fill", flagColor(src[c]));
+  $("#map-title").textContent = title;
+}
+const CYCLE = [undefined, "verde", "amarilla", "roja"];
+function cycle(cod) {
+  const k = state.turn;
+  if (!(k in state.dec) || readOnly(k) || !isOpen(k)) return;
+  if (state.flagMode !== "dec") setFlagMode("dec");
+  const i = CYCLE.indexOf(state.dec[k][cod]);
+  const nxt = CYCLE[(i + 1) % CYCLE.length];
+  if (nxt) state.dec[k][cod] = nxt; else delete state.dec[k][cod];
+  save(); paintMap(); renderStrip();
+}
+function renderStrip() {
+  const k = state.turn, row = $("#strip-row"), box = $("#day-box");
+  const isDec = k in state.dec, isRev = k === "revision";
+  row.hidden = !(isDec || isRev); box.hidden = !isRev;
+  if (row.hidden) return;
+  let src, label;
+  if (isRev) { src = {}; const r = DATA.real[state.day] || {}; for (const c in r) src[c] = r[c][0]; }
+  else src = state.dec[k];
+  $("#strip").innerHTML = DATA.playas.map((p) => {
+    const f = src[p.cod] || (isRev ? "nd" : "");
+    const txt = isRev ? (src[p.cod] || "sin dato") : (src[p.cod] || "sin decidir");
+    return `<button type="button" class="sc ${f}" data-c="${p.cod}" ${isRev || readOnly(k) ? "disabled" : ""} title="${esc(p.nombre)}: ${txt}"><span class="dot">${p.orden}</span><span class="nm">${esc(SHORT[p.cod] || p.nombre)}</span></button>`;
+  }).join("");
+  if (isDec) document.querySelectorAll("#strip .sc").forEach((b) => b.onclick = () => cycle(b.dataset.c));
+  const ref = { "turno-2": "turno-1", "turno-3": "turno-2" }[k];
+  const n = isDec ? Object.keys(state.dec[k]).length : 0;
+  $("#strip-tools").innerHTML = isRev ? `<span class="note">Banderas reales del día elegido</span>` :
+    readOnly(k) ? `<span class="note">Turno cerrado: la decisión ya no se puede cambiar</span>` :
+    `<span class="note">${n}/${DATA.playas.length} · clic en la playa para cambiar</span>` +
+    (k === "turno-1" && !ALUMNO ? `<button type="button" class="btn" id="fill-prot">Rellenar con el protocolo</button>` : "") +
+    (ref ? `<button type="button" class="btn" id="copy-prev">Copiar el turno anterior</button>` : "") +
+    `<button type="button" class="btn" id="clear-dec">Borrar</button><span id="clear-confirm" hidden><button type="button" class="btn" id="clear-yes">Sí, borrar</button></span>`;
+  if (isDec) {
+    const fp = $("#fill-prot"); if (fp) fp.onclick = () => { for (const c in DATA.prot) state.dec[k][c] = DATA.prot[c].b; save(); paintMap(); renderStrip(); };
+    const cp = $("#copy-prev"); if (cp) cp.onclick = () => { state.dec[k] = Object.assign({}, state.dec[ref]); save(); paintMap(); renderStrip(); };
+    $("#clear-dec").onclick = () => { $("#clear-confirm").hidden = false; };
+    $("#clear-yes").onclick = () => { state.dec[k] = {}; save(); paintMap(); renderStrip(); };
+  }
+}
+function setFlagMode(m) {
+  state.flagMode = m;
+  [["dec", "#fm-dec"], ["prot", "#fm-prot"], ["real", "#fm-real"]].forEach(([k, s]) => $(s).setAttribute("aria-pressed", String(k === m)));
+  paintMap();
+}
+$("#fm-dec").onclick = () => setFlagMode("dec");
+$("#fm-prot").onclick = () => setFlagMode("prot");
+$("#fm-real").onclick = () => setFlagMode("real");
+
+// ---------- utilidades de tiempo y lluvia ----------
+const DOW = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"];
+function fmtDay(d) { const x = new Date(d + "T12:00"); return `${DOW[x.getDay()]} ${x.getDate()}/09`; }
+function rainUntil(est, t) { return DATA.rain[est].filter(([ts]) => ts < t); }
+function sumWindow(est, t, hours) {
+  const end = new Date(t), start = new Date(end - hours * 3600e3);
+  return DATA.rain[est].reduce((a, [ts, v]) => { const d = new Date(ts); return d >= start && d < end ? a + v : a; }, 0);
+}
+function max30(est, t, hours) {
+  const end = new Date(t), start = new Date(end - hours * 3600e3);
+  return DATA.rain[est].reduce((a, [ts, v]) => { const d = new Date(ts); return d >= start && d < end ? Math.max(a, v) : a; }, 0);
+}
+function rainChart(t) {
+  const W = 640, H = 190, L = 34, R = 10, T = 10, B = 26;
+  const t0 = new Date("2020-09-06T00:00"), t1 = new Date("2020-09-13T12:00"), now = new Date(t);
+  const x = (d) => L + (W - L - R) * (d - t0) / (t1 - t0), ymax = 24, y = (v) => T + (H - T - B) * (1 - v / ymax);
+  let s = `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Lluvia semihoraria hasta el momento del turno">`;
+  for (const v of [0, 5, 10, 15, 20]) s += `<line x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
+  for (let d = 6; d <= 13; d++) { const xd = x(new Date(`2020-09-${String(d).padStart(2, "0")}T00:00`)); s += `<line x1="${xd}" x2="${xd}" y1="${T}" y2="${H - B}" stroke="var(--line)" stroke-width="1"/>`; if (d < 13) s += `<text x="${xd + 3}" y="${H - 8}" font-size="10" fill="var(--muted)" font-family="IBM Plex Mono, monospace">${fmtDay(`2020-09-${String(d).padStart(2, "0")}`)}</text>`; }
+  if (now < t1) s += `<rect x="${x(now)}" y="${T}" width="${W - R - x(now)}" height="${H - T - B}" fill="var(--surface-2)"/><text x="${(x(now) + W - R) / 2}" y="${T + 16}" text-anchor="middle" font-size="11" fill="var(--muted)">futuro: aún no lo sabéis</text>`;
+  const bw = Math.max(1.6, (W - L - R) / ((t1 - t0) / 1800e3) * 0.9);
+  [["X4", "var(--x4)", 0], ["D5", "var(--d5)", bw]].forEach(([est, col, off]) => {
+    rainUntil(est, t).forEach(([ts, v]) => { if (v > 0) { const d = new Date(ts); s += `<rect x="${x(d) + off - bw}" y="${y(Math.min(v, ymax))}" width="${bw}" height="${y(0) - y(Math.min(v, ymax))}" fill="${col}"/>`; } });
+  });
+  if (now < t1) s += `<line x1="${x(now)}" x2="${x(now)}" y1="${T}" y2="${H - B}" stroke="var(--ink)" stroke-width="1.5" stroke-dasharray="4 3"/><text x="${x(now) - 4}" y="${T + 30}" text-anchor="end" font-size="11" font-weight="600" fill="var(--ink)">ahora</text>`;
+  s += `<text x="${L}" y="${T + 8}" font-size="10" fill="var(--muted)">mm / 30 min</text></svg>`;
+  return s;
+}
+function rainBlock(t, eyebrow) {
+  const k = [["X4", "El Raval (X4)"], ["D5", "Obs. Fabra (D5)"]].map(([e, n]) => {
+    const a24 = sumWindow(e, t, 24), a72 = sumWindow(e, t, 72), m = max30(e, t, 24);
+    return `<div class="kpi ${a24 > 10 ? "on" : ""}"><span class="l">${n} · 24 h</span><span class="v">${a24.toFixed(1)} mm</span><span class="l">72 h: ${a72.toFixed(1)} mm · máx. 30 min: ${m.toFixed(1)}</span></div>`;
+  }).join("");
+  const act = ["X4", "D5"].some((e) => sumWindow(e, t, 24) > 10);
+  return `<div class="card stack"><div><span class="eyebrow">${eyebrow || "Lo que sabéis ahora"}</span><h2>Lluvia</h2></div>${rainChart(t)}
+    <div class="legend"><span><i style="background:var(--x4)"></i>El Raval (X4)</span><span><i style="background:var(--d5)"></i>Observatori Fabra (D5)</span></div>
+    <div class="kpis">${k}<div class="kpi"><span class="l">Protocolo (24 h &gt; 10 mm)</span><span class="v" style="color:${act ? "var(--flag-r)" : "var(--flag-g)"}">${act ? "Activo" : "No activo"}</span><span class="l">a las ${t.slice(11)} h</span></div></div></div>`;
+}
+function analBlock(t, all) {
+  const day = t.slice(0, 10);
+  const rows = DATA.anal.filter((a) => all || a[2] <= day).sort((a, b) => a[1].localeCompare(b[1]) || ORDER[a[0]] - ORDER[b[0]]);
+  let body;
+  if (!rows.length) body = `<p class="empty">Todavía no ha llegado ningún resultado. Las muestras de hoy se conocerán dentro de 48 h.</p>`;
+  else {
+    const dates = [...new Set(rows.map((r) => r[1]))];
+    const cods = DATA.playas.map((p) => p.cod).filter((c) => rows.some((r) => r[0] === c));
+    body = `<div class="scroll"><table><thead><tr><th>Playa</th>${dates.map((d) => `<th>Muestra ${fmtDay(d)}</th>`).join("")}</tr></thead><tbody>` +
+      cods.map((c) => `<tr><td>${ORDER[c]}. ${esc(NAME[c])}</td>${dates.map((d) => { const r = rows.find((x) => x[0] === c && x[1] === d); if (!r) return "<td></td>"; const bad = r[3] > 500 || r[4] > 200; return `<td class="num ${bad ? "bad" : ""}">${r[3]} / ${r[4]}${bad ? " ✗" : ""}</td>`; }).join("")}</tr>`).join("") +
+      `</tbody></table></div><p class="note">E. coli / enterococos (ufc/100 ml). ✗ = no conforme (E. coli &gt; 500 o enterococos &gt; 200). Cada resultado llega 48 h después de la muestra. <b>Datos simulados.</b></p>`;
+  }
+  return `<div class="card stack"><div><span class="eyebrow">${all ? "Toda la semana" : "Lo que sabéis ahora"}</span><h2>Analíticas recibidas</h2></div>${body}</div>`;
+}
+const RESOURCES = `<div class="res">
+  <div><b>1 embarcación</b>limpieza de flotantes: 2 playas por mañana</div>
+  <div><b>2 equipos de muestreo</b>6 muestras extra al día en total</div>
+  <div><b>Megafonía y carteles</b>en todas las playas</div>
+  <div><b>Laboratorio</b>resultados 48 h después de la muestra</div></div>`;
+
+function decBlock(k, ref) {
+  const d = state.dec[k];
+  const rows = DATA.playas.map((p) => {
+    const btns = ["verde", "amarilla", "roja"].map((f) => `<button type="button" data-k="${k}" data-c="${p.cod}" data-f="${f}" aria-pressed="${d[p.cod] === f}">${f[0].toUpperCase() + f.slice(1)}</button>`).join("");
+    const prev = ref && state.dec[ref][p.cod] ? `<span class="chip ${state.dec[ref][p.cod]}" title="Decisión del turno anterior">${state.dec[ref][p.cod]}</span>` : "";
+    return `<div class="dec-row"><div class="n"><span class="dot">${p.orden}</span><span>${esc(p.nombre)}</span> ${prev}</div><div class="flags" role="group" aria-label="Bandera para ${esc(p.nombre)}">${btns}</div></div>`;
+  }).join("");
+  const n = Object.keys(d).length;
+  return `<div class="card stack" id="dec-card"><div><span class="eyebrow">Vuestra decisión</span><h2>Bandera de cada playa</h2></div>
+    <div class="dec">${rows}</div>
+    <div class="row-btns"><span class="note" id="dec-count">${n} de ${DATA.playas.length} playas decididas</span>
+    ${k === "turno-1" ? `<button type="button" class="btn" id="fill-prot">Rellenar con el protocolo</button>` : ""}
+    ${ref ? `<button type="button" class="btn" id="copy-prev">Copiar el turno anterior</button>` : ""}
+    <button type="button" class="btn" id="clear-dec">Borrar este turno</button><span class="note" id="clear-confirm" hidden>¿Seguro? <button type="button" class="btn" id="clear-yes">Sí, borrar</button></span></div></div>`;
+}
+function wireDec(k, ref) {
+  document.querySelectorAll("#dec-card .flags button").forEach((b) => b.onclick = () => {
+    const c = b.dataset.c, f = b.dataset.f;
+    if (state.dec[k][c] === f) delete state.dec[k][c]; else state.dec[k][c] = f;
+    save(); render();
+  });
+  const fp = $("#fill-prot"); if (fp) fp.onclick = () => { for (const c in DATA.prot) state.dec[k][c] = DATA.prot[c].b; save(); render(); };
+  const cp = $("#copy-prev"); if (cp) cp.onclick = () => { state.dec[k] = Object.assign({}, state.dec[ref]); save(); render(); };
+  $("#clear-dec").onclick = () => { $("#clear-confirm").hidden = false; };
+  $("#clear-yes").onclick = () => { state.dec[k] = {}; save(); render(); };
+}
+
+// ---------- vistas ----------
+const VIEWS = {
+  briefing() {
+    return `<div class="card stack"><div><span class="eyebrow">El rol</span><h2>Sois el equipo técnico de playas de guardia</h2></div>
+      <p>Durante la semana del 7 de septiembre de 2020 llueve varias veces sobre Barcelona. La red de alcantarillado es unitaria: cuando llueve fuerte, los aliviaderos vierten al mar agua residual mezclada con pluviales, muchos en los propios espigones. Cada mañana tenéis que decidir qué bandera izar en cada playa, con la información disponible en ese momento y sin mirar adelante.</p></div>
+    <div class="card stack"><div><span class="eyebrow">La sesión</span><h2>Cómo se organiza</h2></div>
+      <div class="sched"><span class="t">10'</span><span><b>Ej. 0.</b> Proyecto QGIS en EPSG:25831, ortofoto ICGC, playas, zona de baño, isóbatas y dominio público.</span>
+      <span class="t">20'</span><span><b>Ej. 1.</b> Servicios por playa, capacidad de carga y cobertura de la megafonía (50 m).</span>
+      <span class="t">20'</span><span><b>Ej. 2.</b> Aliviaderos a menos de 50 m de la costa, agrupados en puntos de vertido; distancia a los puntos de muestreo.</span>
+      <span class="t">50'</span><span><b>Ej. 3.</b> Simulador en cuatro turnos: lunes 7, miércoles 9, sábado 12 y revisión.</span></div></div>
+    <div class="card stack"><div><span class="eyebrow">Reglas del simulador</span><h2>Protocolo de la práctica</h2></div>
+      <ol class="tasks"><li><b>Activación:</b> si en alguna estación la lluvia de 24 h supera 10 mm, todos los puntos de vertido han aliviado.</li>
+      <li><b>Pluma:</b> 300 m alrededor de cada punto de vertido, desplazada 150 m hacia el suroeste (deriva litoral).</li>
+      <li><b>Bandera:</b> roja si la pluma cubre más del 50 % de la zona de baño; amarilla si cubre una parte; verde si no la toca.</li></ol>
+      ${RESOURCES}
+      <p class="note">Bandera verde: baño libre. Amarilla: precaución. Roja: baño prohibido. Una decisión anotada no se corrige al abrir el turno siguiente.</p>
+      <div class="row-btns"><button type="button" class="btn primary" data-go="turno-1">Empezar: lunes 7, 8:00 h</button></div></div>`;
+  },
+  "turno-1"() {
+    const t = TURNS[1].t;
+    return `<div class="card stack"><div><span class="eyebrow">Turno 1 · ≈20 min</span><h2>Ha llovido esta noche. Las playas abren a las 10.</h2></div>
+      <p class="inject">«Esta noche ha caído una tormenta fuerte sobre el centro: 21,9 mm en media hora en el Raval a las 23 h. En Collserola casi no ha llovido. Tenéis una embarcación de limpieza y dos equipos de muestreo. Decidid.»</p>
+      <ol class="tasks"><li>¿Se activa el protocolo?</li><li>Dibujad la pluma en QGIS y calculad el % de zona de baño afectada en cada playa.</li><li>¿Qué duchas, accesos, altavoces y socorrismo quedan dentro de la pluma?</li><li>Repartid la embarcación (2 playas) y las 6 muestras extra.</li><li>Anotad la bandera de cada playa: clic en la playa del mapa o en la franja de colores.</li></ol>${RESOURCES}</div>
+      ${rainBlock(t)}${analBlock(t)}`;
+  },
+  "turno-2"() {
+    const t = TURNS[2].t;
+    return `<div class="card stack"><div><span class="eyebrow">Turno 2 · ≈10 min · PO3_turno2.zip</span><h2>Ha vuelto a llover. Llegan los primeros resultados.</h2></div>
+      <p class="inject">«Desde el lunes ha vuelto a llover dos veces, el lunes por la tarde y esta madrugada, más en Collserola que en el centro. Han llegado los resultados del lunes. Os llaman los chiringuitos de Nova Icària y Bogatell: quieren abrir el fin de semana. ¿Qué hacéis?»</p>
+      <ol class="tasks"><li>¿Dónde ha llovido? ¿Sigue activo el protocolo?</li><li>¿De qué día son las muestras que ya conocéis? ¿Confirman la decisión del lunes?</li><li>¿Qué respondéis a los chiringuitos? (situación simulada)</li><li>Anotad las banderas de hoy en el mapa.</li></ol></div>
+      ${rainBlock(t)}${analBlock(t)}`;
+  },
+  "turno-3"() {
+    const t = TURNS[3].t;
+    return `<div class="card stack"><div><span class="eyebrow">Turno 3 · ≈10 min · PO3_turno3.zip</span><h2>Sábado de sol. La playa se llenará.</h2></div>
+      <p class="inject">«Sol, ni una nube, y la playa se llenará. La última tormenta fue el miércoles por la tarde. Acaban de llegar los resultados del jueves. La prensa pregunta. Decidid y escribid el comunicado.»</p>
+      <ol class="tasks"><li>¿Qué dicen las muestras del jueves 10?</li><li>¿Qué bandera izáis hoy en cada playa? ¿Qué dato esperáis para reabrir?</li><li>Comunicado de prensa de 50 palabras como máximo.</li></ol>
+      <label class="stack" for="comunicado" style="gap:6px"><span class="eyebrow">Comunicado (≤ 50 palabras)</span>
+      <textarea id="comunicado" rows="3" style="width:100%;font:inherit;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)"></textarea>
+      <span class="note" id="wc">0 palabras</span></label></div>
+      ${rainBlock(t)}${analBlock(t)}`;
+  },
+  revision() {
+    const t = TURNS[4].t;
+    const days = Object.keys(DATA.real).sort();
+    const idx = Math.max(0, days.indexOf(state.day));
+    const cmp = [["turno-1", "2020-09-07", "Lun 7"], ["turno-2", "2020-09-09", "Mié 9"], ["turno-3", "2020-09-12", "Sáb 12"]];
+    let hits = 0, tot = 0;
+    const rows = DATA.playas.map((p) => `<tr><td>${p.orden}. ${esc(p.nombre)}</td>` + cmp.map(([k, d]) => {
+      const mine = state.dec[k][p.cod], real = (DATA.real[d] || {})[p.cod];
+      const r = real ? real[0] : null;
+      if (mine && r) { tot++; if (mine === r) hits++; }
+      const mark = mine && r ? (mine === r ? `<span class="match">✓</span>` : `<span class="miss">✗</span>`) : "";
+      return `<td>${mine ? `<span class="chip ${mine}">${mine}</span>` : "<span class='note'>—</span>"}</td><td>${r ? `<span class="chip ${r}">${r}</span>` : "<span class='chip nd'>sin dato</span>"} ${mark}</td>`;
+    }).join("") + "</tr>").join("");
+    return `<div class="card stack"><div><span class="eyebrow">Turno 4 · Revisión · PO3_turno4_debrief.zip</span><h2>¿Qué pasó realmente?</h2></div>
+      <p>Mueve el selector de días, debajo del mapa, para ver la bandera que se izó cada mañana (primer parte del día). La franja de colores bajo el mapa muestra las mismas banderas.</p></div>
+      ${rainBlock(t, "Toda la semana")}
+      <div class="card stack"><div><span class="eyebrow">Vuestras decisiones frente a la realidad</span><h2>${tot ? `${hits} de ${tot} banderas coinciden` : "Sin decisiones anotadas"}</h2></div>
+      <div class="scroll"><table><thead><tr><th>Playa</th>${cmp.map(([, , l]) => `<th>Vosotros ${l}</th><th>Real ${l}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table></div></div>
+      ${analBlock(t, true)}
+      <div class="card stack"><div><span class="eyebrow">Para la discusión</span><h2>Lo que enseña esta semana</h2></div>
+      <ol class="lesson">
+        <li>La lluvia no cae igual en toda la ciudad: el domingo, tormenta sobre el centro; el lunes por la tarde y el miércoles, sobre Collserola.</li>
+        <li>El 9 y el 10 la bandera roja se concentró en el sur (Sant Sebastià–Somorrostro), junto al puerto: poca renovación del agua y aguas abajo de la deriva. El protocolo, que solo mira los aliviaderos, no lo prevé.</li>
+        <li>El viernes 11 se levantó la bandera en casi todas las playas sin ninguna analítica conforme. El sábado 12 llegaron los resultados del jueves y hubo que volver a izar la roja en todas, con la playa llena.</li>
+        <li>La analítica confirma a posteriori, con 48 h de retraso. La decisión del día se toma con la lluvia, el protocolo y el criterio técnico.</li>
+        <li>¿Qué cambiaríais? Umbrales por cuenca, previsión de lluvia, modelos predictivos o analítica rápida.</li></ol></div>`;
+  },
+};
+
+function render() {
+  const t = TURNS.find((x) => x.id === state.turn) || TURNS[0];
+  $("#clock-day").textContent = t.day || "Antes de empezar";
+  $("#clock-time").textContent = t.t && t.id !== "revision" ? t.t.slice(11) : "—";
+  $("#steps").innerHTML = TURNS.map((x) => `<button type="button" class="step" data-go="${x.id}" ${x.id === state.turn ? 'aria-current="step"' : ""}><b>${x.short}</b><span>${isOpen(x.id) ? x.sub : "Cerrado · con código"}</span></button>`).join("");
+  if (!isOpen(t.id)) { $("#panel").innerHTML = lockView(t); wireLock(t); $("#strip-row").hidden = true; $("#day-box").hidden = true; for (const c in beachEls) beachEls[c].setAttribute("fill", "var(--sand)"); setBarH(); return; }
+  // versión alumno: el protocolo y su pluma son la solución del turno 1; solo se ven en la revisión
+  const ocultaSol = ALUMNO && t.id !== "revision";
+  $("#fm-prot").hidden = ocultaSol;
+  $("#t-pluma").closest("label").hidden = ocultaSol;
+  if (ocultaSol) { $("#t-pluma").checked = false; gPluma.style.display = "none"; if (state.flagMode === "prot") state.flagMode = "dec"; }
+  $("#panel").innerHTML = VIEWS[t.id]() + (ALUMNO ? entregaView(t) : "");
+  if (ALUMNO) wireEntrega(t);
+  document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
+  $("#fm-real").disabled = t.id !== "revision";
+  if (t.id !== "revision" && state.flagMode === "real") state.flagMode = "dec";
+
+  if (t.id === "turno-3") {
+    const ta = $("#comunicado"); try { ta.value = localStorage.getItem("po3-sala-com") || ""; } catch (e) {}
+    const wc = () => { const n = (ta.value.trim().match(/\S+/g) || []).length; $("#wc").textContent = `${n} palabras` + (n > 50 ? " · demasiado largo" : ""); };
+    ta.oninput = () => { wc(); try { localStorage.setItem("po3-sala-com", ta.value); } catch (e) {} }; wc();
+  }
+  if (t.id === "revision") {
+    const days = Object.keys(DATA.real).sort(); const r = $("#day");
+    r.max = days.length - 1; if (days.indexOf(state.day) >= 0) r.value = days.indexOf(state.day);
+    $("#days").innerHTML = days.map((d) => `<span>${fmtDay(d)}</span>`).join("");
+    const upd = () => { state.day = days[+r.value]; renderStrip(); const m = [...new Set(Object.values(DATA.real[state.day]).flatMap((x) => (x[1] || "").split(/;\s*/)).filter(Boolean))]; $("#day-motivo").textContent = `${fmtDay(state.day)} · motivo declarado: ${m.length ? m.join(", ") : "ninguno (bandera verde)"}`; paintMap(); };
+    r.oninput = upd; upd();
+  }
+  ["dec", "prot", "real"].forEach((k) => $(`#fm-${k}`).setAttribute("aria-pressed", String(k === state.flagMode)));
+  renderStrip(); paintMap(); setBarH();
+}
+function setBarH() { document.documentElement.style.setProperty("--bar-h", document.querySelector(".bar").offsetHeight + "px"); }
+window.addEventListener("resize", setBarH);
+function go(id) { if (location.hash !== "#" + id) location.hash = id; else { state.turn = id; render(); } }
+// ---------- versión alumno: códigos, justificación y descarga ----------
+function lockView(t) {
+  return `<div class="card stack"><div><span class="eyebrow">${esc(t.short)} · ${esc(t.sub)}</span><h2>Este turno se abre con el código del profesor</h2></div>
+    <p>Cuando el profesor dé la hora simulada, os dirá un código. Escribidlo aquí para abrir el turno. Al abrirlo, la decisión del turno anterior queda cerrada.</p>
+    <form id="code-form" class="row-btns" autocomplete="off"><input id="code-in" type="text" aria-label="Código del turno" style="font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);text-transform:uppercase">
+    <button type="submit" class="btn primary">Abrir turno</button><span class="note" id="code-msg" role="status"></span></form></div>`;
+}
+function wireLock(t) {
+  $("#code-form").onsubmit = (e) => {
+    e.preventDefault();
+    if (CODE_HASH[t.id] === hashCode($("#code-in").value)) { state.unlocked.push(t.id); save(); render(); }
+    else $("#code-msg").textContent = "Código incorrecto. Revisad cómo se escribe.";
+  };
+}
+function entregaView(t) {
+  const k = t.id; const nombre = `<label class="stack" style="gap:4px" for="nombre"><span class="eyebrow">Nombre y grupo</span>
+    <input id="nombre" type="text" value="${esc(state.nombre)}" placeholder="Ej.: Grupo 3 · Ana Pérez, Joan Vidal" style="font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink)"></label>`;
+  const dl = `<div class="row-btns"><button type="button" class="btn primary" id="descarga">Descargar mis decisiones</button><span class="note">Entregad el archivo .txt en la tarea del Campus Virtual.</span></div>`;
+  if (k === "revision") return `<div class="card stack"><div><span class="eyebrow">Entrega</span><h2>Reflexión final</h2></div>
+    <label class="stack" style="gap:4px" for="just"><span class="eyebrow">¿Qué cambiaríais del protocolo después de esta semana?</span><textarea id="just" rows="4" style="font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);width:100%">${esc(state.just.revision || "")}</textarea></label>
+    ${nombre}${dl}</div>`;
+  if (!(k in state.dec)) return `<div class="card stack"><div><span class="eyebrow">Entrega</span><h2>Vuestro grupo</h2></div>${nombre}${dl}</div>`;
+  const ro = readOnly(k) ? "disabled" : "";
+  const st = `font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);width:100%`;
+  const rec = k === "turno-1" ? `<label class="stack" style="gap:4px" for="barco"><span class="eyebrow">Embarcación de limpieza (2 playas)</span><input id="barco" type="text" ${ro} value="${esc(state.recursos.barco)}" style="${st}"></label>
+    <label class="stack" style="gap:4px" for="muestras"><span class="eyebrow">6 muestras extra: dónde</span><input id="muestras" type="text" ${ro} value="${esc(state.recursos.muestras)}" style="${st}"></label>` : "";
+  return `<div class="card stack"><div><span class="eyebrow">Vuestra decisión · ${esc(t.short)}</span><h2>Justificación</h2></div>
+    <p class="note">La bandera de cada playa se marca en el mapa. Aquí explicad por qué${k === "turno-1" ? " y cómo repartís los recursos" : " y qué cambia respecto al turno anterior"}.${readOnly(k) ? " <b>Turno cerrado.</b>" : ""}</p>
+    ${rec}<label class="stack" style="gap:4px" for="just"><span class="eyebrow">Por qué</span><textarea id="just" rows="4" ${ro} style="${st}">${esc(state.just[k] || "")}</textarea></label>
+    ${nombre}${dl}</div>`;
+}
+function wireEntrega(t) {
+  const k = t.id;
+  const bind = (id, fn) => { const e = $("#" + id); if (e) e.oninput = () => { fn(e.value); save(); }; };
+  bind("nombre", (v) => state.nombre = v);
+  bind("just", (v) => state.just[k] = v);
+  bind("barco", (v) => state.recursos.barco = v);
+  bind("muestras", (v) => state.recursos.muestras = v);
+  $("#descarga").onclick = descargar;
+}
+function descargar() {
+  let com = ""; try { com = localStorage.getItem("po3-sala-com") || ""; } catch (e) {}
+  const linea = (k) => DATA.playas.map((p) => `  ${p.orden}. ${p.nombre}: ${state.dec[k][p.cod] || "sin decidir"}`).join("\n");
+  const L = [];
+  L.push("PO3 · Sala de crisis · Playas de Barcelona (Aguas Marinas, UB)");
+  L.push(`Nombre y grupo: ${state.nombre || "(sin indicar)"}`);
+  L.push(`Descargado: ${new Date().toLocaleString("es-ES")}`);
+  [["turno-1", "Turno 1 · lunes 7/09, 8:00"], ["turno-2", "Turno 2 · miércoles 9/09, 8:00"], ["turno-3", "Turno 3 · sábado 12/09, 8:00"]].forEach(([k, tit]) => {
+    L.push("", `== ${tit} ==`, "Banderas:", linea(k));
+    if (k === "turno-1") L.push(`Embarcación: ${state.recursos.barco || "-"}`, `Muestras extra: ${state.recursos.muestras || "-"}`);
+    if (k === "turno-3") L.push(`Comunicado: ${com || "-"}`);
+    L.push(`Justificación: ${state.just[k] || "-"}`);
+  });
+  if (state.unlocked.includes("revision")) {
+    let hits = 0, tot = 0;
+    [["turno-1", "2020-09-07"], ["turno-2", "2020-09-09"], ["turno-3", "2020-09-12"]].forEach(([k, d]) => DATA.playas.forEach((p) => {
+      const m = state.dec[k][p.cod], r = (DATA.real[d] || {})[p.cod]; if (m && r) { tot++; if (m === r[0]) hits++; } }));
+    L.push("", `== Revisión ==`, `Coincidencias con las banderas reales: ${hits} de ${tot}`, `Reflexión: ${state.just.revision || "-"}`);
+  }
+  L.push("", "--- datos (no editar) ---", JSON.stringify({ nombre: state.nombre, dec: state.dec, recursos: state.recursos, just: state.just, comunicado: com }));
+  const slug = (state.nombre || "grupo").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "_").slice(0, 40);
+  const blob = new Blob([L.join("\n")], { type: "text/plain;charset=utf-8" });
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `PO3_sala_${slug}.txt`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+function fromHash() {
+  const h = location.hash.slice(1); state.turn = TURNS.some((x) => x.id === h) ? h : "briefing";
+  if (state.turn === "revision") { state.flagMode = "real"; }
+  render(); window.scrollTo({ top: 0 });
+}
+window.addEventListener("hashchange", fromHash);
+document.addEventListener("keydown", (e) => {
+  if (e.target.closest("textarea, input")) return;
+  const i = TURNS.findIndex((x) => x.id === state.turn);
+  if (e.key === "ArrowRight" && i < TURNS.length - 1) go(TURNS[i + 1].id);
+  if (e.key === "ArrowLeft" && i > 0) go(TURNS[i - 1].id);
+});
+fromHash();
+</script>
+
+</body>
+</html>

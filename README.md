@@ -2,7 +2,7 @@
 
 Simulador de la práctica **PO3 «Gestión integral de playas con SIG»** de la asignatura *Aguas Marinas* (Máster en Ciencia y Gestión Integral del Agua, Universitat de Barcelona).
 
-**Abrir el simulador:** https://athanor8732.github.io/po3-sala-de-crisis/
+**Abrir el simulador:** https://cerdadomenech.cat/po3-sala-de-crisis/
 
 ## Cómo se usa en clase
 

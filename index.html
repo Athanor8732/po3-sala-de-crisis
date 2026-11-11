@@ -516,7 +516,8 @@ function render() {
   $("#clock-day").textContent = t.day || "Antes de empezar";
   $("#clock-time").textContent = t.t && t.id !== "revision" ? t.t.slice(11) : "—";
   $("#steps").innerHTML = TURNS.map((x) => `<button type="button" class="step" data-go="${x.id}" ${x.id === state.turn ? 'aria-current="step"' : ""}><b>${x.short}</b><span>${isOpen(x.id) ? x.sub : "Cerrado · con código"}</span></button>`).join("");
-  if (!isOpen(t.id)) { $("#panel").innerHTML = lockView(t); wireLock(t); $("#strip-row").hidden = true; $("#day-box").hidden = true; for (const c in beachEls) beachEls[c].setAttribute("fill", "var(--sand)"); setBarH(); return; }
+  const wireSteps = () => document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
+  if (!isOpen(t.id)) { $("#panel").innerHTML = lockView(t); wireLock(t); wireSteps(); $("#strip-row").hidden = true; $("#day-box").hidden = true; for (const c in beachEls) beachEls[c].setAttribute("fill", "var(--sand)"); setBarH(); return; }
   // versión alumno: el protocolo y su pluma son la solución del turno 1; solo se ven en la revisión
   const ocultaSol = ALUMNO && t.id !== "revision";
   $("#fm-prot").hidden = ocultaSol;
@@ -524,7 +525,7 @@ function render() {
   if (ocultaSol) { $("#t-pluma").checked = false; gPluma.style.display = "none"; if (state.flagMode === "prot") state.flagMode = "dec"; }
   $("#panel").innerHTML = VIEWS[t.id]() + (ALUMNO ? entregaView(t) : "");
   if (ALUMNO) wireEntrega(t);
-  document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
+  wireSteps();
   $("#fm-real").disabled = t.id !== "revision";
   if (t.id !== "revision" && state.flagMode === "real") state.flagMode = "dec";
 
